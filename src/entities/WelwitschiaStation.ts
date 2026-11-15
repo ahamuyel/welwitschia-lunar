@@ -10,6 +10,7 @@
 
 import * as THREE from 'three';
 import { createSolarPanelTexture, createWelwitschiaEmblemTexture } from '../world/ProceduralTextures';
+import type { DomeInteractions, ResourceState } from '../types/game';
 
 export class WelwitschiaStation {
   public group: THREE.Group;
@@ -24,6 +25,9 @@ export class WelwitschiaStation {
   public parkingFloodLight: THREE.SpotLight;
   public highGainDishGroup: THREE.Group;
   public emblemMesh: THREE.Mesh;
+
+  public interactiveTerminals: THREE.Mesh[] = [];
+  private terminalRenderers: Map<string, { canvas: HTMLCanvasElement; texture: THREE.CanvasTexture }> = new Map();
 
   private isAirlockOpen: boolean = false;
 
@@ -232,15 +236,38 @@ export class WelwitschiaStation {
     consoleMesh.position.set(0, 2.0, 0);
     this.group.add(consoleMesh);
 
-    // Telas holográficas centrais emissivas em ciano
-    const screenGeo = new THREE.BoxGeometry(2.0, 1.1, 0.08);
-    const screenMat = new THREE.MeshBasicMaterial({ color: 0x00f0ff });
-    for (let s = 0; s < 4; s++) {
+    // 4 Terminais Holográficos Interativos para Realidade Virtual / 360°
+    const terminalDefs = [
+      { id: 'ENERGY', angle: 0, title: '[1] SISTEMA DE ENERGIA // ROVER', color: '#ffb84d' },
+      { id: 'OXYGEN', angle: 1, title: '[2] SUPORTE DE VIDA // TRAJE', color: '#00f0ff' },
+      { id: 'BRIEFING', angle: 2, title: '[3] BRIEFING // ARTEMIS 2032', color: '#38bdf8' },
+      { id: 'AIRLOCK', angle: 3, title: '[4] ESCOTILHA DE SAÍDA // AIRLOCK', color: '#a855f7' }
+    ];
+
+    terminalDefs.forEach((def) => {
+      const { canvas, texture } = this.createTerminalCanvas(
+        def.title,
+        '[OLHAR OU CLIQUE PARA ATIVAR]',
+        'SISTEMA EM ESPERA',
+        false,
+        def.color
+      );
+      this.terminalRenderers.set(def.id, { canvas, texture });
+
+      const screenGeo = new THREE.BoxGeometry(2.0, 1.15, 0.08);
+      const screenMat = new THREE.MeshBasicMaterial({
+        map: texture,
+        transparent: true,
+        side: THREE.DoubleSide
+      });
       const scr = new THREE.Mesh(screenGeo, screenMat);
-      scr.position.set(Math.cos(s * 1.57) * 2.2, 3.1, Math.sin(s * 1.57) * 2.2);
+      scr.position.set(Math.cos(def.angle * 1.57) * 2.2, 3.1, Math.sin(def.angle * 1.57) * 2.2);
       scr.lookAt(0, 3.1, 0);
+      scr.userData = { actionId: def.id, type: 'terminal', title: def.title };
+
+      this.interactiveTerminals.push(scr);
       this.group.add(scr);
-    }
+    });
 
     // 4 Módulos de Estufa Hidropônica Vertical (torres de cultivo)
     const towerGeo = new THREE.CylinderGeometry(1.2, 1.2, 6.0, 12);
@@ -562,5 +589,128 @@ export class WelwitschiaStation {
       (panel.material as THREE.MeshStandardMaterial).map = cleanTexture;
       (panel.material as THREE.MeshStandardMaterial).needsUpdate = true;
     });
+  }
+
+  private createTerminalCanvas(
+    title: string,
+    actionText: string,
+    statusText: string,
+    isComplete: boolean,
+    colorHex: string
+  ): { canvas: HTMLCanvasElement; texture: THREE.CanvasTexture } {
+    const canvas = document.createElement('canvas');
+    canvas.width = 512;
+    canvas.height = 256;
+    this.drawTerminalCanvas(canvas, title, actionText, statusText, isComplete, colorHex);
+    const texture = new THREE.CanvasTexture(canvas);
+    return { canvas, texture };
+  }
+
+  private drawTerminalCanvas(
+    canvas: HTMLCanvasElement,
+    title: string,
+    actionText: string,
+    statusText: string,
+    isComplete: boolean,
+    colorHex: string
+  ): void {
+    const ctx = canvas.getContext('2d')!;
+    ctx.fillStyle = '#060f22';
+    ctx.fillRect(0, 0, 512, 256);
+
+    ctx.strokeStyle = isComplete ? '#22c55e' : colorHex;
+    ctx.lineWidth = 6;
+    ctx.strokeRect(6, 6, 500, 244);
+
+    ctx.fillStyle = isComplete ? '#15803d' : colorHex;
+    ctx.fillRect(6, 6, 500, 48);
+
+    ctx.font = 'bold 22px monospace';
+    ctx.fillStyle = '#020617';
+    ctx.textAlign = 'center';
+    ctx.fillText(title, 256, 38);
+
+    ctx.font = 'bold 24px monospace';
+    ctx.fillStyle = isComplete ? '#4ade80' : '#ffd27a';
+    ctx.fillText(statusText, 256, 120);
+
+    ctx.fillStyle = isComplete ? 'rgba(34, 197, 94, 0.2)' : 'rgba(0, 240, 255, 0.2)';
+    ctx.fillRect(30, 160, 452, 65);
+    ctx.strokeStyle = isComplete ? '#22c55e' : '#00f0ff';
+    ctx.lineWidth = 3;
+    ctx.strokeRect(30, 160, 452, 65);
+
+    ctx.font = 'bold 20px monospace';
+    ctx.fillStyle = isComplete ? '#86efac' : '#38bdf8';
+    ctx.fillText(actionText, 256, 202);
+  }
+
+  public updateTerminals(interactions: DomeInteractions, resources: ResourceState): void {
+    // 1. Energia
+    const energyData = this.terminalRenderers.get('ENERGY');
+    if (energyData) {
+      const isComplete = interactions.energyRedirected;
+      this.drawTerminalCanvas(
+        energyData.canvas,
+        '[1] SISTEMA DE ENERGIA // ROVER',
+        isComplete ? '✓ ENERGIA REDIRECIONADA' : '⚡ [OLHAR / CLIQUE P/ CARREGAR]',
+        isComplete ? 'BATERIA DO ROVER: 100%' : `BATERIA: ${Math.round(resources.roverBattery)}% [BAIXA]`,
+        isComplete,
+        '#ffb84d'
+      );
+      energyData.texture.needsUpdate = true;
+    }
+
+    // 2. Oxigênio
+    const oxygenData = this.terminalRenderers.get('OXYGEN');
+    if (oxygenData) {
+      const isComplete = interactions.suitRefilled;
+      this.drawTerminalCanvas(
+        oxygenData.canvas,
+        '[2] SUPORTE DE VIDA // TRAJE',
+        isComplete ? '✓ TRAJE REABASTECIDO' : '🫁 [OLHAR / CLIQUE P/ ENCHER]',
+        isComplete ? 'OXIGÉNIO: 100% [PRESSURIZADO]' : `OXIGÉNIO: ${Math.round(resources.suitOxygen)}% [BAIXO]`,
+        isComplete,
+        '#00f0ff'
+      );
+      oxygenData.texture.needsUpdate = true;
+    }
+
+    // 3. Briefing
+    const briefingData = this.terminalRenderers.get('BRIEFING');
+    if (briefingData) {
+      const isComplete = interactions.briefingViewed;
+      this.drawTerminalCanvas(
+        briefingData.canvas,
+        '[3] BRIEFING // ARTEMIS 2032',
+        isComplete ? '✓ BRIEFING TRANSMITIDO' : '📡 [OLHAR / CLIQUE P/ TRANSMITIR]',
+        isComplete ? 'OBJETIVOS CONFIRMADOS' : 'ALVO: LRO-SCOUT (650m NE)',
+        isComplete,
+        '#38bdf8'
+      );
+      briefingData.texture.needsUpdate = true;
+    }
+
+    // 4. Airlock
+    const airlockData = this.terminalRenderers.get('AIRLOCK');
+    if (airlockData) {
+      const canOpen = interactions.energyRedirected && interactions.suitRefilled && interactions.briefingViewed;
+      const isComplete = interactions.airlockOpened;
+      this.drawTerminalCanvas(
+        airlockData.canvas,
+        '[4] ESCOTILHA DE SAÍDA // AIRLOCK',
+        canOpen
+          ? isComplete ? '✓ A ABRIR ESCOTILHA...' : '🚪 [OLHAR / CLIQUE P/ ABRIR]'
+          : '🔒 [BLOQUEADO: COMPLETE 1, 2 E 3]',
+        canOpen ? 'SISTEMAS PRONTOS P/ EVA' : 'PREPARAÇÃO OBRIGATÓRIA',
+        isComplete,
+        '#a855f7'
+      );
+      airlockData.texture.needsUpdate = true;
+    }
+  }
+
+  public getInteractiveObjects(): THREE.Object3D[] {
+    return [...this.interactiveTerminals];
   }
 }

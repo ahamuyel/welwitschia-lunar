@@ -25,6 +25,7 @@ export const DomeManagementScreen: React.FC<DomeManagementScreenProps> = ({
 }) => {
   const [briefingModalOpen, setBriefingModalOpen] = useState<boolean>(false);
   const [isOpeningAirlock, setIsOpeningAirlock] = useState<boolean>(false);
+  const [is3DViewMode, setIs3DViewMode] = useState<boolean>(true);
 
   const canOpen = interactions.energyRedirected && interactions.suitRefilled && interactions.briefingViewed;
 
@@ -49,13 +50,37 @@ export const DomeManagementScreen: React.FC<DomeManagementScreenProps> = ({
             ESTAÇÃO WELWITSCHIA // MÓDULO DE COMANDO CENTRAL
           </span>
         </div>
-        <div className="text-xs font-mono text-cyan-400">
-          PRESSÃO INTERNA: 101.3 kPa • O₂ BASE: {resources.baseOxygen}%
+        <div className="flex items-center gap-4">
+          <div className="text-xs font-mono text-cyan-400 hidden sm:block">
+            PRESSÃO INTERNA: 101.3 kPa • O₂ BASE: {resources.baseOxygen}%
+          </div>
+          <button
+            onClick={() => setIs3DViewMode(!is3DViewMode)}
+            className="px-3 py-1.5 rounded-lg border border-cyan-500/50 bg-cyan-950/40 text-cyan-300 hover:bg-cyan-500/20 text-xs font-mono font-bold cursor-pointer transition-all"
+            title="Alternar entre visualização imersiva 3D/VR da Cúpula e Painel 2D"
+          >
+            {is3DViewMode ? '📋 Abrir Painel 2D' : '🥽 Modo Imersivo 3D/VR'}
+          </button>
         </div>
       </div>
 
-      {/* Painel Central: Status de Recursos & Ações Preparatórias Obrigatórias */}
-      <div className="pointer-events-auto max-w-4xl mx-auto w-full grid grid-cols-1 md:grid-cols-2 gap-4 my-auto">
+      {/* Se modo 3D Imersivo ativo: mostra banner inferior discreto indicando interação direta */}
+      {is3DViewMode ? (
+        <div className="pointer-events-auto mx-auto mb-6 bg-slate-950/90 border border-cyan-500/40 rounded-2xl px-6 py-3.5 backdrop-blur-xl shadow-2xl flex items-center gap-4 text-center">
+          <div className="text-xl">🥽</div>
+          <div className="text-xs font-mono text-cyan-200">
+            <span className="font-bold text-amber-400">MODO IMERSIVO NA CÚPULA:</span> Olhe fixo com a mira ou clique nos <span className="font-bold text-cyan-300">4 terminais holográficos 3D</span> ao redor para preparar a missão e abrir o airlock!
+          </div>
+          <button
+            onClick={() => setIs3DViewMode(false)}
+            className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded text-[11px] font-mono cursor-pointer whitespace-nowrap"
+          >
+            Ver Painel 2D
+          </button>
+        </div>
+      ) : (
+        /* Painel Central: Status de Recursos & Ações Preparatórias Obrigatórias */
+        <div className="pointer-events-auto max-w-4xl mx-auto w-full grid grid-cols-1 md:grid-cols-2 gap-4 my-auto">
         {/* Coluna 1: Diagnóstico dos Sistemas e Alertas */}
         <div className="bg-slate-950/90 border border-cyan-500/40 rounded-xl p-5 backdrop-blur-lg shadow-xl space-y-4">
           <div className="flex items-center justify-between border-b border-slate-800 pb-3">
@@ -197,6 +222,7 @@ export const DomeManagementScreen: React.FC<DomeManagementScreenProps> = ({
           </div>
         </div>
       </div>
+    )}
 
       {/* Modal do EVA Briefing */}
       {briefingModalOpen && (

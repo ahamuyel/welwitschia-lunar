@@ -8,7 +8,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import type { GameState, ResourceState, TelemetryData, DomeInteractions, MissionReport, CameraViewMode } from './types/game';
 import { gameStateManager } from './state/GameStateManager';
 import { soundManager } from './audio/SoundManager';
-import { LunarGameCanvas } from './components/LunarGameCanvas';
+import { LunarGameCanvas, type TouchDriveInputs } from './components/LunarGameCanvas';
 import { WellyCopilot } from './ui/WellyCopilot';
 import { PrologueScreen } from './ui/PrologueScreen';
 import { DomeManagementScreen } from './ui/DomeManagementScreen';
@@ -21,6 +21,14 @@ export function App() {
   const [gameState, setGameState] = useState<GameState>(gameStateManager.currentState);
   const [resources, setResources] = useState<ResourceState>({ ...gameStateManager.resources });
   const [domeInteractions, setDomeInteractions] = useState<DomeInteractions>({ ...gameStateManager.domeInteractions });
+  const [isVRActive, setIsVRActive] = useState<boolean>(true); // Modo VR ativado como padrão
+  const [touchDriveInputs, setTouchDriveInputs] = useState<TouchDriveInputs>({
+    forward: false,
+    backward: false,
+    left: false,
+    right: false,
+    brake: false
+  });
   const [telemetry, setTelemetry] = useState<TelemetryData>({
     speedKmh: 0,
     headingDeg: 45,
@@ -189,7 +197,7 @@ export function App() {
 
   return (
     <div className="relative w-screen h-screen overflow-hidden bg-black font-sans select-none">
-      {/* 1. Viewport 3D Three.js com Post-Processing e Física Avançada */}
+      {/* 1. Viewport 3D Three.js com Post-Processing, Física Avançada e WebVR */}
       <LunarGameCanvas
         gameState={gameState}
         onUpdateTelemetry={handleUpdateTelemetry}
@@ -201,16 +209,55 @@ export function App() {
         cameraMode={cameraMode}
         onToggleCamera={handleToggleCamera}
         onToggleHeadlights={handleToggleHeadlights}
+        isVRActive={isVRActive}
+        onToggleVR={() => setIsVRActive((prev) => !prev)}
+        domeInteractions={domeInteractions}
+        resources={resources}
+        onRedirectEnergy={handleRedirectEnergy}
+        onRefillSuitOxygen={handleRefillSuitOxygen}
+        onViewBriefing={handleViewBriefing}
+        onOpenAirlock={handleOpenAirlock}
+        touchDriveInputs={touchDriveInputs}
       />
 
-      {/* 2. Botão Flutuante de Silenciar Áudio */}
-      <button
-        onClick={handleToggleMute}
-        className="fixed top-4 left-4 z-50 p-2.5 rounded-full bg-slate-950/80 border border-slate-800 text-slate-300 hover:text-white shadow-lg backdrop-blur-md cursor-pointer transition-all"
-        title={isMuted ? 'Desmutar áudio' : 'Silenciar áudio'}
-      >
-        {isMuted ? '🔇' : '🔊'}
-      </button>
+      {/* Visor periférico do capacete espacial (Ativo no Modo VR) */}
+      {isVRActive && (
+        <div
+          id="helmet-visor"
+          className="fixed inset-0 pointer-events-none z-10 transition-opacity duration-500"
+          style={{
+            background:
+              'radial-gradient(ellipse 86% 82% at 50% 50%, transparent 65%, rgba(8, 18, 42, 0.35) 84%, rgba(3, 7, 18, 0.92) 100%)',
+            boxShadow: 'inset 0 0 55px rgba(0, 229, 255, 0.2)'
+          }}
+        />
+      )}
+
+      {/* 2. Botão Flutuante de Silenciar Áudio e Alternar VR */}
+      <div className="fixed top-4 left-4 z-50 flex items-center gap-2">
+        <button
+          onClick={handleToggleMute}
+          className="p-2.5 rounded-full bg-slate-950/80 border border-slate-800 text-slate-300 hover:text-white shadow-lg backdrop-blur-md cursor-pointer transition-all"
+          title={isMuted ? 'Desmutar áudio' : 'Silenciar áudio'}
+        >
+          {isMuted ? '🔇' : '🔊'}
+        </button>
+
+        {gameState === 'STATE_DOME_MANAGEMENT' && (
+          <button
+            onClick={() => setIsVRActive((prev) => !prev)}
+            className="px-3 py-2 rounded-xl border text-xs font-mono font-bold backdrop-blur-md shadow-lg transition-all cursor-pointer"
+            style={{
+              borderColor: isVRActive ? '#00e5ff' : '#ffd27a',
+              color: isVRActive ? '#00e5ff' : '#ffd27a',
+              backgroundColor: 'rgba(5, 14, 36, 0.88)'
+            }}
+            title="Alternar entre Modo VR (Imersivo com Giroscópio) e Modo Normal 360°"
+          >
+            {isVRActive ? '🥽 Modo: VR [Ativo]' : '📱 Modo: Normal 360°'}
+          </button>
+        )}
+      </div>
 
       {/* 3. Copiloto IA Welly (Fila Sequencial, Chat Conversacional Híbrido e Voz) */}
       <WellyCopilot
@@ -244,6 +291,9 @@ export function App() {
             onToggleHeadlights={handleToggleHeadlights}
             onToggleCamera={handleToggleCamera}
             onExtractData={isNearLostRover ? handleExtractDataModule : undefined}
+            isVRActive={isVRActive}
+            onToggleVR={() => setIsVRActive((prev) => !prev)}
+            onTouchDriveInputs={setTouchDriveInputs}
           />
           <ControlsHelp />
         </>
