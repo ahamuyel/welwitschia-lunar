@@ -525,6 +525,17 @@ export class GameStateManager {
     return true;
   }
 
+  public enterBaseFromExterior(): void {
+    soundManager.stopMotor();
+    soundManager.stopSonar();
+    soundManager.playAirlockDepressurization();
+    soundManager.playSuccessChime();
+    this.domeInteractions.airlockOpened = false;
+    this.setState('STATE_DOME_MANAGEMENT');
+    this.notifyResources();
+    this.notifyBaseInterior();
+  }
+
   // --- LOOP DE CONSUMO DE RECURSOS EM TEMPO REAL ---
 
   public updateResources(delta: number, speedKmh: number, isHeadlightsOn: boolean): {

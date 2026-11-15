@@ -64,6 +64,8 @@ interface LunarGameCanvasProps {
   onResolveEmergencyChoice: (choice: 'A' | 'B') => void;
   onCalibrateValve: (valveIndex: 1 | 2) => void;
   onCycleHologram: () => void;
+  onNearBaseAirlockChange?: (isNear: boolean) => void;
+  onEnterBase?: () => void;
   touchDriveInputs?: TouchDriveInputs;
 }
 
@@ -89,10 +91,13 @@ export const LunarGameCanvas: React.FC<LunarGameCanvasProps> = ({
   onResolveEmergencyChoice,
   onCalibrateValve,
   onCycleHologram,
+  onNearBaseAirlockChange,
+  onEnterBase,
   touchDriveInputs
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const isNearRef = useRef<boolean>(false);
+  const isNearAirlockRef = useRef<boolean>(false);
   const gameStateRef = useRef<GameState>(gameState);
   const cameraModeRef = useRef<CameraViewMode>(cameraMode);
   const isVRActiveRef = useRef<boolean>(isVRActive);
@@ -102,9 +107,16 @@ export const LunarGameCanvas: React.FC<LunarGameCanvasProps> = ({
   const touchDriveInputsRef = useRef<TouchDriveInputs | undefined>(touchDriveInputs);
 
   const vrManagerRef = useRef<VRManager | null>(null);
+  const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
+  const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
 
   useEffect(() => {
     gameStateRef.current = gameState;
+    // Sempre que houver troca de ambiente (interior <-> exterior), liga explicitamente camera + canvas e reaplica o modo VR/360°
+    if (vrManagerRef.current && cameraRef.current && rendererRef.current) {
+      vrManagerRef.current.attachCamera(cameraRef.current, rendererRef.current.domElement);
+      vrManagerRef.current.setVRMode(isVRActiveRef.current);
+    }
   }, [gameState]);
 
   useEffect(() => {
@@ -114,7 +126,7 @@ export const LunarGameCanvas: React.FC<LunarGameCanvasProps> = ({
   useEffect(() => {
     isVRActiveRef.current = isVRActive;
     if (vrManagerRef.current) {
-      vrManagerRef.current.setVRActive(isVRActive);
+      vrManagerRef.current.setVRMode(isVRActive);
     }
   }, [isVRActive]);
 
@@ -148,6 +160,7 @@ export const LunarGameCanvas: React.FC<LunarGameCanvasProps> = ({
     renderer.toneMappingExposure = 1.22;
     renderer.domElement.style.touchAction = 'none';
     container.appendChild(renderer.domElement);
+    rendererRef.current = renderer;
 
     // 2. Cena & Câmera
     const scene = new THREE.Scene();
@@ -158,10 +171,11 @@ export const LunarGameCanvas: React.FC<LunarGameCanvasProps> = ({
       6000
     );
     scene.add(camera);
+    cameraRef.current = camera;
 
-    // 3. VR Manager (Head-Tracking, Quaternions calibrados e Gaze Fuse 0.85s)
-    const vrManager = new VRManager(camera);
-    vrManager.setVRActive(isVRActiveRef.current);
+    // 3. VR Manager Unificado (Head-Tracking, Quaternions calibrados, Gaze Fuse 0.8s e Controlo 360° com setPointerCapture)
+    const vrManager = new VRManager(camera, renderer.domElement);
+    vrManager.setVRMode(isVRActiveRef.current);
     vrManagerRef.current = vrManager;
 
     // 4. Post-Processing Pipeline (EffectComposer + UnrealBloomPass sutil)
@@ -194,8 +208,8 @@ export const LunarGameCanvas: React.FC<LunarGameCanvasProps> = ({
     const station = new WelwitschiaStation(baseAltitude);
     scene.add(station.group);
 
-    // 9. Rover do Jogador (inicialmente posicionado na saída da escotilha)
-    const roverInitialPos = new THREE.Vector3(0, baseAltitude + 0.52, 22.0);
+    // 9. Rover do Jogador (inicialmente posicionado na baía exterior da escotilha)
+    const roverInitialPos = new THREE.Vector3(0, baseAltitude + 0.52, 24.5);
     const playerRover = new PlayerRover();
     scene.add(playerRover.group);
 
@@ -209,7 +223,7 @@ export const LunarGameCanvas: React.FC<LunarGameCanvasProps> = ({
     lostRover.interactionBeacon.userData = { actionId: 'SCOUT_DATA', type: 'scout' };
     scene.add(lostRover.group);
 
-    // Callback de disparo por Gaze Fuse ou Clique
+    // Callback de disparo por Gaze Fuse (0.8s) ou Toque Direto
     const handleTriggerAction = (actionId: string) => {
       soundManager.playUiBeep(920, 0.05);
       switch (actionId) {
@@ -243,6 +257,9 @@ export const LunarGameCanvas: React.FC<LunarGameCanvasProps> = ({
         case 'SCOUT_DATA':
           onExtractDataModule();
           break;
+        case 'ENTER_BASE':
+          onEnterBase?.();
+          break;
       }
     };
 
@@ -250,6 +267,18 @@ export const LunarGameCanvas: React.FC<LunarGameCanvasProps> = ({
       const actionId = obj.userData?.actionId;
       if (actionId) {
         handleTriggerAction(actionId);
+      }
+    });
+
+    vrManager.setTapCallback((clientX, clientY) => {
+      const currentSt = gameStateRef.current;
+      const interactables: THREE.Object3D[] =
+        currentSt === 'STATE_DOME_MANAGEMENT'
+          ? station.getInteractiveObjects()
+          : [...station.getExteriorInteractiveObjects(), lostRover.interactionBeacon];
+      const clicked = vrManager.performClickRaycast(clientX, clientY, interactables);
+      if (clicked?.userData?.actionId) {
+        handleTriggerAction(clicked.userData.actionId);
       }
     });
 
@@ -327,33 +356,6 @@ export const LunarGameCanvas: React.FC<LunarGameCanvasProps> = ({
 
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('keyup', handleKeyUp);
-
-    // Controlo por toque / rato para rotação manual em 360°
-    const handlePointerDown = (e: PointerEvent) => {
-      vrManager.onPointerDown(e.clientX, e.clientY);
-    };
-
-    const handlePointerMove = (e: PointerEvent) => {
-      vrManager.onPointerMove(e.clientX, e.clientY);
-    };
-
-    const handlePointerUp = (e: PointerEvent) => {
-      const wasTap = vrManager.onPointerUp();
-      if (!wasTap) return;
-      // Verificação de clique/toque direto em terminais interativos 3D
-      const interactables: THREE.Object3D[] = [
-        ...station.getInteractiveObjects(),
-        lostRover.interactionBeacon
-      ];
-      const clicked = vrManager.performClickRaycast(e.clientX, e.clientY, interactables);
-      if (clicked?.userData?.actionId) {
-        handleTriggerAction(clicked.userData.actionId);
-      }
-    };
-
-    container.addEventListener('pointerdown', handlePointerDown);
-    window.addEventListener('pointermove', handlePointerMove);
-    window.addEventListener('pointerup', handlePointerUp);
 
     // Redimensionamento de tela
     const handleResize = () => {
@@ -508,10 +510,19 @@ export const LunarGameCanvas: React.FC<LunarGameCanvasProps> = ({
           onNearLostRoverChange(isNear);
         }
 
-        // Foco de olhar Gaze Fuse para extração de dados ao aproximar-se do LRO-Scout
-        if (isNear) {
-          vrManager.updateGaze(delta, [lostRover.interactionBeacon]);
+        // Deteção de proximidade (< 4.0m) da porta/escotilha exterior da base Welwitschia (z = 20.2m)
+        const distToAirlock = Math.hypot(roverPhysics.position.x - 0, roverPhysics.position.z - 20.2);
+        const isNearAirlock = distToAirlock <= 4.0;
+        if (isNearAirlock !== isNearAirlockRef.current) {
+          isNearAirlockRef.current = isNearAirlock;
+          onNearBaseAirlockChange?.(isNearAirlock);
         }
+
+        // Foco de olhar Gaze Fuse (0.8s) ativo no exterior para a porta da base e para o LRO-Scout
+        vrManager.updateGaze(delta, [
+          ...station.getExteriorInteractiveObjects(),
+          lostRover.interactionBeacon
+        ]);
 
         onUpdateTelemetry({
           speedKmh,
@@ -535,29 +546,23 @@ export const LunarGameCanvas: React.FC<LunarGameCanvasProps> = ({
           cameraMode: currentCameraMode
         });
 
-        // --- CÂMARA COCKPIT VR VS TERCEIRA PESSOA ---
-        if (currentCameraMode === 'COCKPIT') {
+        // --- CÂMARA NO EXTERIOR LUNAR (MODO VR & MODO 360°) ---
+        if (vrManager.isVRActive || currentCameraMode === 'COCKPIT') {
           playerRover.cockpitCameraNode.getWorldPosition(cameraCockpitPos);
           camera.position.copy(cameraCockpitPos);
 
-          if (vrManager.isVRActive) {
-            // Em VR: combina a orientação física do rover com o Head-Tracking da cabeça do piloto
-            const headQuat = vrManager.getHeadOrientation();
-            camera.quaternion.copy(roverPhysics.orientationQuaternion).multiply(headQuat);
-          } else {
-            const forwardWorld = new THREE.Vector3(0, 0, 1)
-              .applyQuaternion(roverPhysics.orientationQuaternion)
-              .normalize();
-            const lookTarget = cameraCockpitPos.clone().add(forwardWorld.multiplyScalar(15));
-            camera.lookAt(lookTarget);
-          }
+          // Tanto em VR (giroscópio) como em Cockpit 360° (toque/rato), combina o chassi do rover com a orientação de olhar
+          const headQuat = vrManager.getHeadOrientation();
+          camera.quaternion.copy(roverPhysics.orientationQuaternion).multiply(headQuat);
         } else {
-          // Terceira Pessoa suave
+          // Terceira Pessoa suave no Modo 360° com suporte a olhar 360° por arrasto
           playerRover.followCameraNode.getWorldPosition(cameraFollowPos);
           camera.position.lerp(cameraFollowPos, Math.min(1.0, delta * 8.0));
 
           const lookTarget = roverPhysics.position.clone().add(new THREE.Vector3(0, 1.2, 0));
           camera.lookAt(lookTarget);
+          const headQuat = vrManager.getHeadOrientation();
+          camera.quaternion.multiply(headQuat);
         }
       } else if (currentGameState === 'STATE_RESCUE_AND_ISRU') {
         orbitAngle += delta * 0.1;
@@ -580,9 +585,6 @@ export const LunarGameCanvas: React.FC<LunarGameCanvasProps> = ({
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
-      container.removeEventListener('pointerdown', handlePointerDown);
-      window.removeEventListener('pointermove', handlePointerMove);
-      window.removeEventListener('pointerup', handlePointerUp);
       window.removeEventListener('resize', handleResize);
       cancelAnimationFrame(animationFrameId);
       soundManager.stopMotor();

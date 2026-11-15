@@ -1,17 +1,12 @@
-## 🌕 Welwitschia Lunar // Pull Request
+## 🚀 Resumo das Alterações
+- Descreve de forma concisa as melhorias ou correções introduzidas neste PR.
 
-### 🚀 Resumo das Alterações
-- MVP 3D em circuito fechado para exploração do Polo Sul Lunar (Cratera Shackleton, ano 2032).
-- Iluminação astronômica realista com Sol polar a 5° e Terra procedural com halo atmosférico.
-- Terreno procedural de 2.500m x 2.500m com relevo Perlin/Simplex e crateras de impacto.
-- Física lunar ($g = -1.62\text{ m/s}^2$), inércia de condução e sistema de colisão real com ricochete.
-- Copiloto IA **Welly** com fila sequencial de mensagens passo a passo e FAQ científica offline.
-- Radar circular com referência contínua da Estação Welwitschia (0, 0).
-- Pós-processamento com `EffectComposer` e `UnrealBloomPass`.
-- Simulação de refinaria ISRU com eletrólise de água lunar ($\text{H}_2\text{O} \rightarrow \text{O}_2 + \text{H}_2$).
+## 🧪 Checklist de Qualidade (Welwitschia Lunar — NASA Space Apps 2026)
+- [ ] `npm run lint` (Oxlint) sem erros
+- [ ] `npx tsc -b --noEmit` com 0 erros de TypeScript
+- [ ] `npm run build` gera `dist/` e `dist/sw.js` corretamente
+- [ ] Testado Modo VR (Giroscópio + Gaze Fuse 0.8s) e Modo Normal 360° (Toque/Arrastar) no interior e exterior
+- [ ] Responsividade Mobile-First preservada (`pointer-events: none` nos wrappers de UI)
 
-### 🧪 Testes Realizados
-- [x] Compilação limpa via `npm run build` (sem erros de tipagem).
-- [x] Validação funcional a 60 FPS com Three.js e Web Audio API.
-- [x] Testes de máquina de estados (5 estados) e transições validadas.
-- [x] Verificação do radar minimapa e sistema de colisão.
+## Fluxo de Branches
+- `feat/*` / `fix/*` ➡️ `develop` ➡️ `main` (Produção Vercel)

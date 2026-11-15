@@ -24,6 +24,7 @@ import { DomeManagementScreen } from './ui/DomeManagementScreen';
 import { RoverHUD } from './ui/RoverHUD';
 import { StormDilemmaModal } from './ui/StormDilemmaModal';
 import { RescueAndISRUScreen } from './ui/RescueAndISRUScreen';
+import { LunarRadar } from './ui/LunarRadar';
 
 export function App() {
   const [gameState, setGameState] = useState<GameState>(gameStateManager.currentState);
@@ -32,6 +33,8 @@ export function App() {
   const [baseInterior, setBaseInterior] = useState<BaseInteriorState>({ ...gameStateManager.baseInterior });
   const [activePanel, setActivePanel] = useState<ActiveUIPanel>('none');
   const [isVRActive, setIsVRActive] = useState<boolean>(true); // Modo VR ativado como padrão
+  const [isRadarVisible, setIsRadarVisible] = useState<boolean>(false); // Oculto por padrão na base, ativável sob demanda
+  const [isNearBaseAirlock, setIsNearBaseAirlock] = useState<boolean>(false);
   const [touchDriveInputs, setTouchDriveInputs] = useState<TouchDriveInputs>({
     forward: false,
     backward: false,
@@ -71,6 +74,7 @@ export function App() {
       setGameState(newState);
       if (newState === 'STATE_DOME_MANAGEMENT') {
         setWellyTrigger('ON_DOME_ENTER');
+        setIsRadarVisible(false);
       } else if (newState === 'STATE_STORM_DILEMMA') {
         setWellyTrigger('ON_STORM_START');
       } else if (newState === 'STATE_RESCUE_AND_ISRU') {
@@ -198,6 +202,23 @@ export function App() {
     setIsNearLostRover(isNear);
   }, []);
 
+  const handleNearBaseAirlockChange = useCallback((isNear: boolean) => {
+    setIsNearBaseAirlock(isNear);
+  }, []);
+
+  const handleEnterBase = useCallback(() => {
+    gameStateManager.enterBaseFromExterior();
+    setDomeInteractions({ ...gameStateManager.domeInteractions });
+    setIsNearBaseAirlock(false);
+    setTouchDriveInputs({
+      forward: false,
+      backward: false,
+      left: false,
+      right: false,
+      brake: false
+    });
+  }, []);
+
   const handleToggleHeadlights = useCallback(() => {
     setTelemetry((prev) => ({ ...prev, isHeadlightsOn: !prev.isHeadlightsOn }));
   }, []);
@@ -241,6 +262,8 @@ export function App() {
         onCollisionAlert={handleCollisionAlert}
         onRockDamage={handleRockDamage}
         onNearLostRoverChange={handleNearLostRoverChange}
+        onNearBaseAirlockChange={handleNearBaseAirlockChange}
+        onEnterBase={handleEnterBase}
         onExtractDataModule={handleExtractDataModule}
         cameraMode={cameraMode}
         onToggleCamera={handleToggleCamera}
@@ -282,6 +305,13 @@ export function App() {
         baseInterior={baseInterior}
       />
 
+      {/* 2.5 Mini-Radar Lunar Compacto (96x96px, pointer-events-none, sob demanda) */}
+      <LunarRadar
+        visible={isRadarVisible && gameState !== 'STATE_PROLOGUE' && gameState !== 'STATE_RESCUE_AND_ISRU'}
+        telemetry={telemetry}
+        gameState={gameState}
+      />
+
       {/* 3. Telas dos 5 Estados de Jogo (UI Minimalista Mobile-First com Estado Exclusivo activePanel) */}
       {gameState === 'STATE_PROLOGUE' && (
         <PrologueScreen onStartMission={handleStartMission} />
@@ -296,6 +326,8 @@ export function App() {
           onChangeActivePanel={setActivePanel}
           isVRActive={isVRActive}
           onToggleVR={() => setIsVRActive((prev) => !prev)}
+          isRadarVisible={isRadarVisible}
+          onToggleRadar={() => setIsRadarVisible((prev) => !prev)}
           onRedirectEnergy={handleRedirectEnergy}
           onRefillSuitOxygen={handleRefillSuitOxygen}
           onViewBriefing={handleViewBriefing}
@@ -316,8 +348,12 @@ export function App() {
           onToggleHeadlights={handleToggleHeadlights}
           onToggleCamera={handleToggleCamera}
           onExtractData={isNearLostRover ? handleExtractDataModule : undefined}
+          isNearBaseAirlock={isNearBaseAirlock}
+          onEnterBase={handleEnterBase}
           isVRActive={isVRActive}
           onToggleVR={() => setIsVRActive((prev) => !prev)}
+          isRadarVisible={isRadarVisible}
+          onToggleRadar={() => setIsRadarVisible((prev) => !prev)}
           onTouchDriveInputs={setTouchDriveInputs}
         />
       )}

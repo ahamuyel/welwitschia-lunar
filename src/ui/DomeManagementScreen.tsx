@@ -16,6 +16,8 @@ interface DomeManagementScreenProps {
   onChangeActivePanel: (panel: ActiveUIPanel) => void;
   isVRActive: boolean;
   onToggleVR: () => void;
+  isRadarVisible: boolean;
+  onToggleRadar: () => void;
   onRedirectEnergy: () => void;
   onRefillSuitOxygen: () => void;
   onViewBriefing: () => void;
@@ -34,6 +36,8 @@ export const DomeManagementScreen: React.FC<DomeManagementScreenProps> = ({
   onChangeActivePanel,
   isVRActive,
   onToggleVR,
+  isRadarVisible,
+  onToggleRadar,
   onRedirectEnergy,
   onRefillSuitOxygen,
   onViewBriefing,
@@ -131,7 +135,7 @@ export const DomeManagementScreen: React.FC<DomeManagementScreenProps> = ({
           </button>
         </div>
 
-        {/* À DIREITA: apenas 2 botões compactos (VR / 360° e ☰) com área de toque mínima 44x44px e gap-2 */}
+        {/* À DIREITA: botões compactos (VR / 360°, 🧭 Radar e ☰) com área de toque mínima 44x44px e gap-2 */}
         <div className="pointer-events-none flex items-center gap-2">
           <button
             type="button"
@@ -144,6 +148,19 @@ export const DomeManagementScreen: React.FC<DomeManagementScreenProps> = ({
             title="Alternar VR / 360°"
           >
             {isVRActive ? 'VR' : '360°'}
+          </button>
+
+          <button
+            type="button"
+            onClick={onToggleRadar}
+            className={`pointer-events-auto min-h-[44px] min-w-[44px] px-3 rounded-full text-xs font-bold backdrop-blur-md border transition-all flex items-center justify-center cursor-pointer ${
+              isRadarVisible
+                ? 'bg-emerald-500/25 border-emerald-400/70 text-emerald-200'
+                : 'bg-slate-950/70 border-white/15 text-slate-100'
+            }`}
+            title="Mostrar / Ocultar Radar Lunar"
+          >
+            🧭 Radar
           </button>
 
           <button

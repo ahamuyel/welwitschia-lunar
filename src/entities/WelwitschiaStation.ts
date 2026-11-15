@@ -27,6 +27,9 @@ export class WelwitschiaStation {
   public emblemMesh: THREE.Mesh;
 
   public interactiveTerminals: THREE.Mesh[] = [];
+  public exteriorAirlockBeacon!: THREE.Mesh;
+  public exteriorAirlockDoor!: THREE.Mesh;
+  private exteriorAirlockRing!: THREE.Mesh;
   private terminalRenderers: Map<string, { canvas: HTMLCanvasElement; texture: THREE.CanvasTexture }> = new Map();
 
   // Iluminação LED perimetral dinâmica e efeitos de janela
@@ -968,7 +971,35 @@ export class WelwitschiaStation {
     const door = new THREE.Mesh(doorGeo, doorMat);
     door.position.set(0, 2.5, 18.5);
     door.castShadow = true;
+    door.userData = { actionId: 'ENTER_BASE', type: 'airlock_entry' };
+    this.exteriorAirlockDoor = door;
     this.group.add(door);
+
+    // Anel luminoso verde/ciano no chão em frente à escotilha exterior + placa holográfica "🚪 ENTRAR NA BASE"
+    const entryRingGeo = new THREE.TorusGeometry(2.35, 0.09, 10, 36);
+    entryRingGeo.rotateX(Math.PI / 2);
+    const entryRingMat = new THREE.MeshBasicMaterial({ color: 0x00f0ff });
+    this.exteriorAirlockRing = new THREE.Mesh(entryRingGeo, entryRingMat);
+    this.exteriorAirlockRing.position.set(0, 1.25, 20.2);
+    this.group.add(this.exteriorAirlockRing);
+
+    const { texture: entryHoloTex } = this.createTerminalCanvas(
+      'ESCOTILHA // AIRLOCK WELWITSCHIA',
+      '👁️ OLHAR 0.8s OU TOQUE P/ ENTRAR',
+      '🚪 ENTRAR NA BASE',
+      true,
+      '#10b981'
+    );
+    const entryHoloGeo = new THREE.BoxGeometry(2.8, 1.25, 0.06);
+    const entryHoloMat = new THREE.MeshBasicMaterial({
+      map: entryHoloTex,
+      transparent: true,
+      side: THREE.DoubleSide
+    });
+    this.exteriorAirlockBeacon = new THREE.Mesh(entryHoloGeo, entryHoloMat);
+    this.exteriorAirlockBeacon.position.set(0, 3.85, 19.05);
+    this.exteriorAirlockBeacon.userData = { actionId: 'ENTER_BASE', type: 'airlock_entry' };
+    this.group.add(this.exteriorAirlockBeacon);
 
     // Portal estrutural de vedação
     const portalGeo = new THREE.BoxGeometry(5.4, 4.4, 0.4);
@@ -1147,6 +1178,14 @@ export class WelwitschiaStation {
         0.96 * strobePulse,
         0.62 * strobePulse,
         0.05 * strobePulse
+      );
+    }
+
+    if (this.exteriorAirlockRing) {
+      const ringPulse = 1.0 + Math.sin(time * 3.5) * 0.06;
+      this.exteriorAirlockRing.scale.set(ringPulse, ringPulse, 1);
+      (this.exteriorAirlockRing.material as THREE.MeshBasicMaterial).color.setHex(
+        Math.sin(time * 3.5) > 0 ? 0x10b981 : 0x00f0ff
       );
     }
 
@@ -1534,5 +1573,12 @@ export class WelwitschiaStation {
 
   public getInteractiveObjects(): THREE.Object3D[] {
     return [...this.interactiveTerminals];
+  }
+
+  public getExteriorInteractiveObjects(): THREE.Object3D[] {
+    const objs: THREE.Object3D[] = [];
+    if (this.exteriorAirlockBeacon) objs.push(this.exteriorAirlockBeacon);
+    if (this.exteriorAirlockDoor) objs.push(this.exteriorAirlockDoor);
+    return objs;
   }
 }

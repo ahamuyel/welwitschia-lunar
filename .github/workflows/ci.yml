@@ -1,0 +1,50 @@
+name: Welwitschia Lunar CI/CD
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+      - 'feat/**'
+      - 'fix/**'
+  pull_request:
+    branches:
+      - main
+      - develop
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint-typecheck-build:
+    name: Lint, Typecheck & Build (Vite + Three.js + WebXR)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm install --include=dev
+
+      - name: Run Oxlint static analysis
+        run: npm run lint
+
+      - name: Run TypeScript compiler check
+        run: npx tsc -b --noEmit
+
+      - name: Build production bundle
+        run: npm run build
+
+      - name: Verify production artifacts (dist & PWA Service Worker)
+        run: |
+          test -f dist/index.html
+          test -f dist/sw.js
+          ls -lh dist/

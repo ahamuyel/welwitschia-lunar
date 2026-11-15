@@ -1,10 +1,9 @@
 /**
- * Welwitschia Lunar - Gerenciador WebVR, Head-Tracking e Gaze Fuse
+ * Welwitschia Lunar - Gerenciador Unificado WebVR, Head-Tracking e Controlo 360°
  * Equipe Mochileiros da Galáxia (NASA Space Apps Angola)
- * - Calibração de Giroscópio (DeviceOrientation) com compensação de ecrã mobile
- * - Retículo 3D com fusão por olhar (Gaze Fuse de 0.85s)
- * - Controlo manual tátil/rato quando o giroscópio está inativo
- * - Suporte a visualização no Cockpit e no interior da Cúpula
+ * - Instância única sincronizada entre Interior da Base e Exterior Lunar
+ * - Modo VR (isVRActive = true): Giroscópio calibrado (DeviceOrientation) + Gaze Fuse (0.8s)
+ * - Modo Normal 360° (isVRActive = false): Giroscópio desativado + arrasto tátil fluido com setPointerCapture
  */
 
 import * as THREE from 'three';
@@ -24,6 +23,7 @@ export class VRManager {
   private progressRingMesh: THREE.Mesh;
 
   private camera: THREE.PerspectiveCamera;
+  private domElement: HTMLElement | null = null;
   private euler = new THREE.Euler(0, 0, 0, 'YXZ');
   private q0 = new THREE.Quaternion();
   private q1 = new THREE.Quaternion(-Math.sqrt(0.5), 0, 0, Math.sqrt(0.5)); // -90° X
@@ -37,6 +37,7 @@ export class VRManager {
   private pitch: number = 0;
   private yaw: number = 0;
   private isDragging: boolean = false;
+  private activePointerId: number | null = null;
   private lastTouchX: number = 0;
   private lastTouchY: number = 0;
   private dragDistance: number = 0;
@@ -49,9 +50,14 @@ export class VRManager {
   private readonly FUSE_DURATION: number = 0.8; // 0.8 segundos
 
   private onGazeTriggerCallback?: (object: THREE.Object3D) => void;
+  private onTapCallback?: (clientX: number, clientY: number) => void;
   private orientationHandler?: (e: DeviceOrientationEvent) => void;
 
-  constructor(camera: THREE.PerspectiveCamera) {
+  private boundPointerDown?: (e: PointerEvent) => void;
+  private boundPointerMove?: (e: PointerEvent) => void;
+  private boundPointerUp?: (e: PointerEvent) => void;
+
+  constructor(camera: THREE.PerspectiveCamera, domElement?: HTMLElement) {
     this.camera = camera;
 
     // 1. Criação do Retículo 3D flutuante preso à câmara
@@ -84,10 +90,82 @@ export class VRManager {
     this.reticleMesh.add(this.progressRingMesh);
     this.drawProgressArc(0);
 
-    this.camera.add(this.reticleMesh);
+    // 2. Ouvinte de Giroscópio e ligação à câmara/canvas
+    this.bindGyroEvents();
+    this.attachCamera(camera, domElement);
+  }
 
-    // 2. Ouvinte de Giroscópio
-    this.bindEvents();
+  /**
+   * Liga explicitamente o VRManager à câmara ativa e ao canvas 3D (usado na inicialização e troca interior <-> exterior).
+   */
+  public attachCamera(camera: THREE.PerspectiveCamera, domElement?: HTMLElement): void {
+    this.camera = camera;
+    if (this.reticleMesh.parent !== this.camera) {
+      this.camera.add(this.reticleMesh);
+    }
+    this.reticleMesh.visible = this.isVRActive;
+
+    if (domElement && domElement !== this.domElement) {
+      this.detachDomEvents();
+      this.domElement = domElement;
+      this.domElement.style.touchAction = 'none';
+
+      this.boundPointerDown = (e: PointerEvent) => {
+        if (e.button !== undefined && e.button !== 0 && e.pointerType === 'mouse') return;
+        this.activePointerId = e.pointerId;
+        try {
+          this.domElement?.setPointerCapture(e.pointerId);
+        } catch {
+          // Ignora se o browser não suportar setPointerCapture para este evento
+        }
+        this.onPointerDown(e.clientX, e.clientY);
+      };
+
+      this.boundPointerMove = (e: PointerEvent) => {
+        if (!this.isDragging) return;
+        if (this.activePointerId !== null && e.pointerId !== this.activePointerId) return;
+        this.onPointerMove(e.clientX, e.clientY);
+      };
+
+      this.boundPointerUp = (e: PointerEvent) => {
+        if (this.activePointerId !== null && e.pointerId !== this.activePointerId) return;
+        try {
+          if (this.domElement?.hasPointerCapture(e.pointerId)) {
+            this.domElement.releasePointerCapture(e.pointerId);
+          }
+        } catch {
+          // Ignora
+        }
+        this.activePointerId = null;
+        const wasTap = this.onPointerUp();
+        if (wasTap && this.onTapCallback) {
+          this.onTapCallback(e.clientX, e.clientY);
+        }
+      };
+
+      this.domElement.addEventListener('pointerdown', this.boundPointerDown);
+      this.domElement.addEventListener('pointermove', this.boundPointerMove);
+      this.domElement.addEventListener('pointerup', this.boundPointerUp);
+      this.domElement.addEventListener('pointercancel', this.boundPointerUp);
+    }
+  }
+
+  private detachDomEvents(): void {
+    if (!this.domElement) return;
+    if (this.boundPointerDown) {
+      this.domElement.removeEventListener('pointerdown', this.boundPointerDown);
+    }
+    if (this.boundPointerMove) {
+      this.domElement.removeEventListener('pointermove', this.boundPointerMove);
+    }
+    if (this.boundPointerUp) {
+      this.domElement.removeEventListener('pointerup', this.boundPointerUp);
+      this.domElement.removeEventListener('pointercancel', this.boundPointerUp);
+    }
+  }
+
+  public setTapCallback(cb: (clientX: number, clientY: number) => void): void {
+    this.onTapCallback = cb;
   }
 
   private drawProgressArc(progress: number): void {
@@ -119,8 +197,10 @@ export class VRManager {
     this.progressTexture.needsUpdate = true;
   }
 
-  private bindEvents(): void {
+  private bindGyroEvents(): void {
     this.orientationHandler = (e: DeviceOrientationEvent) => {
+      // No Modo 360° (isVRActive === false), ignora completamente leituras do giroscópio
+      if (!this.isVRActive) return;
       if (e.alpha !== null && e.beta !== null && e.gamma !== null) {
         if (e.alpha === 0 && e.beta === 0 && e.gamma === 0) return;
         this.deviceAlpha = e.alpha;
@@ -133,6 +213,7 @@ export class VRManager {
   }
 
   public dispose(): void {
+    this.detachDomEvents();
     if (this.orientationHandler) {
       window.removeEventListener('deviceorientation', this.orientationHandler, true);
     }
@@ -157,16 +238,33 @@ export class VRManager {
     }
   }
 
-  public setVRActive(active: boolean): void {
+  public setVRMode(active: boolean): void {
+    const wasVR = this.isVRActive;
     this.isVRActive = active;
     this.reticleMesh.visible = active;
+
+    if (!active && wasVR && this.camera) {
+      // Sincroniza yaw/pitch atuais da câmara ao entrar no Modo Normal 360° para rotação suave sem saltos
+      const currentEuler = new THREE.Euler().setFromQuaternion(this.camera.quaternion, 'YXZ');
+      this.yaw = currentEuler.y;
+      this.pitch = Math.max(-1.31, Math.min(1.31, currentEuler.x));
+    }
+
     if (active) {
       this.requestIOSPermission();
+    } else {
+      this.drawProgressArc(0);
+      this.gazedObject = null;
+      this.gazeTimer = 0;
     }
   }
 
+  public setVRActive(active: boolean): void {
+    this.setVRMode(active);
+  }
+
   public toggleVR(): boolean {
-    this.setVRActive(!this.isVRActive);
+    this.setVRMode(!this.isVRActive);
     return this.isVRActive;
   }
 
@@ -183,8 +281,10 @@ export class VRManager {
     const dy = clientY - this.lastTouchY;
     this.dragDistance += Math.hypot(dx, dy);
 
-    this.yaw -= dx * 0.004;
-    this.pitch = Math.max(-1.45, Math.min(1.45, this.pitch - dy * 0.004));
+    // Rotação horizontal livre 360° (yaw) e vertical -75° a +75° (-1.31 a +1.31 rad)
+    const sensitivity = 0.0052;
+    this.yaw -= dx * sensitivity;
+    this.pitch = Math.max(-1.31, Math.min(1.31, this.pitch - dy * sensitivity));
 
     this.lastTouchX = clientX;
     this.lastTouchY = clientY;
@@ -207,7 +307,9 @@ export class VRManager {
   }
 
   /**
-   * Calcula o Quaternion de orientação do utilizador (Giroscópio calibrado do Edgar + offset tátil ou Manual 360°)
+   * Calcula o Quaternion de orientação da câmara:
+   * - Modo VR (isVRActive === true): Giroscópio calibrado do Edgar (ou fallback tátil se sem giroscópio)
+   * - Modo Normal 360° (isVRActive === false): Controlo tátil/rato 100% fluido (yaw 360°, pitch -75° a +75°)
    */
   public getHeadOrientation(): THREE.Quaternion {
     if (this.isVRActive && this.isGyroAvailable) {
@@ -234,7 +336,7 @@ export class VRManager {
   }
 
   /**
-   * Atualiza o foco de olhar (Gaze Fuse) com base nos objetos interativos na cena
+   * Atualiza o foco de olhar (Gaze Fuse 0.8s) nos objetos interativos do ambiente ativo (interior ou exterior)
    */
   public updateGaze(delta: number, interactables: THREE.Object3D[]): void {
     if (!this.isVRActive) {
@@ -247,7 +349,6 @@ export class VRManager {
     const hit = hits.find((h) => h.object.visible);
 
     if (hit) {
-      // Procura o objeto raiz com userData válido
       let targetObj: THREE.Object3D | null = hit.object;
       while (targetObj && !targetObj.userData?.actionId && targetObj.parent && targetObj.parent !== targetObj) {
         if (targetObj.userData?.actionId) break;
@@ -288,10 +389,13 @@ export class VRManager {
   }
 
   public performClickRaycast(clientX: number, clientY: number, interactables: THREE.Object3D[]): THREE.Object3D | null {
-    const mouse = new THREE.Vector2(
-      (clientX / window.innerWidth) * 2 - 1,
-      -(clientY / window.innerHeight) * 2 + 1
-    );
+    const rect = this.domElement?.getBoundingClientRect();
+    const width = rect ? rect.width : window.innerWidth;
+    const height = rect ? rect.height : window.innerHeight;
+    const x = rect ? clientX - rect.left : clientX;
+    const y = rect ? clientY - rect.top : clientY;
+
+    const mouse = new THREE.Vector2((x / width) * 2 - 1, -(y / height) * 2 + 1);
     this.raycaster.setFromCamera(mouse, this.camera);
     const hits = this.raycaster.intersectObjects(interactables, true);
     const hit = hits.find((h) => h.object.visible);

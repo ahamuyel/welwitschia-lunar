@@ -11,8 +11,12 @@ interface RoverHUDProps {
   onToggleHeadlights: () => void;
   onToggleCamera: () => void;
   onExtractData?: () => void;
+  isNearBaseAirlock?: boolean;
+  onEnterBase?: () => void;
   isVRActive: boolean;
   onToggleVR: () => void;
+  isRadarVisible: boolean;
+  onToggleRadar: () => void;
   onTouchDriveInputs?: (inputs: TouchDriveInputs) => void;
 }
 
@@ -24,8 +28,12 @@ export const RoverHUD: React.FC<RoverHUDProps> = ({
   onToggleHeadlights,
   onToggleCamera,
   onExtractData,
+  isNearBaseAirlock,
+  onEnterBase,
   isVRActive,
   onToggleVR,
+  isRadarVisible,
+  onToggleRadar,
   onTouchDriveInputs
 }) => {
   const [isMuted, setIsMuted] = useState(soundManager.isAudioMuted());
@@ -98,7 +106,7 @@ export const RoverHUD: React.FC<RoverHUDProps> = ({
           </span>
         </div>
 
-        {/* À DIREITA: Apenas 2 botões compactos (VR / 360° e ☰) com min 44x44px e gap-2 */}
+        {/* À DIREITA: Botões compactos (VR / 360°, 🧭 Radar e ☰) com min 44x44px e gap-2 */}
         <div className="pointer-events-none flex items-center gap-2">
           <button
             type="button"
@@ -110,6 +118,19 @@ export const RoverHUD: React.FC<RoverHUDProps> = ({
             }`}
           >
             {isVRActive ? 'VR' : '360°'}
+          </button>
+
+          <button
+            type="button"
+            onClick={onToggleRadar}
+            className={`pointer-events-auto min-h-[44px] min-w-[44px] px-3 rounded-full text-xs font-bold backdrop-blur-md border transition-all flex items-center justify-center cursor-pointer ${
+              isRadarVisible
+                ? 'bg-emerald-500/25 border-emerald-400/70 text-emerald-200'
+                : 'bg-slate-950/70 border-white/15 text-slate-100'
+            }`}
+            title="Mostrar / Ocultar Radar Lunar"
+          >
+            🧭 Radar
           </button>
 
           <button
@@ -190,9 +211,22 @@ export const RoverHUD: React.FC<RoverHUDProps> = ({
         </div>
       )}
 
+      {/* BOTÃO FLUTUANTE LIMPO "🚪 Entrar na Base" (Aparece automaticamente a < 4.0m da porta Airlock) */}
+      {isNearBaseAirlock && onEnterBase && (
+        <div className="fixed bottom-16 inset-x-0 flex justify-center pointer-events-none px-4 z-25">
+          <button
+            type="button"
+            onClick={onEnterBase}
+            className="pointer-events-auto min-h-[46px] px-6 py-2.5 rounded-full bg-cyan-500/90 hover:bg-cyan-400 text-slate-950 font-black text-xs sm:text-sm border border-cyan-200 shadow-xl backdrop-blur-md cursor-pointer"
+          >
+            🚪 Entrar na Base
+          </button>
+        </div>
+      )}
+
       {/* BOTÃO DE EXTRAÇÃO DO MÓDULO LRO-SCOUT */}
       {onExtractData && (
-        <div className="fixed bottom-16 inset-x-0 flex justify-center pointer-events-none px-4">
+        <div className="fixed bottom-16 inset-x-0 flex justify-center pointer-events-none px-4 z-25">
           <button
             type="button"
             onClick={onExtractData}
@@ -204,71 +238,67 @@ export const RoverHUD: React.FC<RoverHUDProps> = ({
       )}
 
       {/* CONTROLOS TÁTEIS DE CONDUÇÃO (44x44px mínimo, gap-2, apenas os botões têm pointer-events-auto) */}
-      {!isVRActive && (
-        <>
-          <div className="fixed bottom-3 left-3 z-25 flex items-center gap-2 pointer-events-none">
-            <button
-              type="button"
-              onPointerDown={() => updateTouch({ left: true })}
-              onPointerUp={() => updateTouch({ left: false })}
-              onPointerCancel={() => updateTouch({ left: false })}
-              onPointerLeave={() => updateTouch({ left: false })}
-              className={`pointer-events-auto min-w-[48px] min-h-[48px] rounded-xl border font-bold text-base flex items-center justify-center backdrop-blur-md select-none ${
-                touchState.left
-                  ? 'bg-cyan-500/45 border-cyan-300 text-white'
-                  : 'bg-slate-950/65 border-white/15 text-cyan-200'
-              }`}
-            >
-              ◀
-            </button>
-            <button
-              type="button"
-              onPointerDown={() => updateTouch({ right: true })}
-              onPointerUp={() => updateTouch({ right: false })}
-              onPointerCancel={() => updateTouch({ right: false })}
-              onPointerLeave={() => updateTouch({ right: false })}
-              className={`pointer-events-auto min-w-[48px] min-h-[48px] rounded-xl border font-bold text-base flex items-center justify-center backdrop-blur-md select-none ${
-                touchState.right
-                  ? 'bg-cyan-500/45 border-cyan-300 text-white'
-                  : 'bg-slate-950/65 border-white/15 text-cyan-200'
-              }`}
-            >
-              ▶
-            </button>
-          </div>
+      <div className="fixed bottom-3 left-3 z-25 flex items-center gap-2 pointer-events-none">
+        <button
+          type="button"
+          onPointerDown={() => updateTouch({ left: true })}
+          onPointerUp={() => updateTouch({ left: false })}
+          onPointerCancel={() => updateTouch({ left: false })}
+          onPointerLeave={() => updateTouch({ left: false })}
+          className={`pointer-events-auto min-w-[48px] min-h-[48px] rounded-xl border font-bold text-base flex items-center justify-center backdrop-blur-md select-none ${
+            touchState.left
+              ? 'bg-cyan-500/45 border-cyan-300 text-white'
+              : 'bg-slate-950/65 border-white/15 text-cyan-200'
+          }`}
+        >
+          ◀
+        </button>
+        <button
+          type="button"
+          onPointerDown={() => updateTouch({ right: true })}
+          onPointerUp={() => updateTouch({ right: false })}
+          onPointerCancel={() => updateTouch({ right: false })}
+          onPointerLeave={() => updateTouch({ right: false })}
+          className={`pointer-events-auto min-w-[48px] min-h-[48px] rounded-xl border font-bold text-base flex items-center justify-center backdrop-blur-md select-none ${
+            touchState.right
+              ? 'bg-cyan-500/45 border-cyan-300 text-white'
+              : 'bg-slate-950/65 border-white/15 text-cyan-200'
+          }`}
+        >
+          ▶
+        </button>
+      </div>
 
-          <div className="fixed bottom-3 right-3 z-25 flex items-center gap-2 pointer-events-none">
-            <button
-              type="button"
-              onPointerDown={() => updateTouch({ backward: true })}
-              onPointerUp={() => updateTouch({ backward: false })}
-              onPointerCancel={() => updateTouch({ backward: false })}
-              onPointerLeave={() => updateTouch({ backward: false })}
-              className={`pointer-events-auto min-w-[48px] min-h-[48px] rounded-xl border font-bold text-xs flex items-center justify-center backdrop-blur-md select-none ${
-                touchState.backward
-                  ? 'bg-amber-500/45 border-amber-300 text-white'
-                  : 'bg-slate-950/65 border-white/15 text-amber-200'
-              }`}
-            >
-              ▼
-            </button>
-            <button
-              type="button"
-              onPointerDown={() => updateTouch({ forward: true })}
-              onPointerUp={() => updateTouch({ forward: false })}
-              onPointerCancel={() => updateTouch({ forward: false })}
-              onPointerLeave={() => updateTouch({ forward: false })}
-              className={`pointer-events-auto min-w-[52px] min-h-[52px] rounded-xl border font-bold text-sm flex items-center justify-center backdrop-blur-md select-none ${
-                touchState.forward
-                  ? 'bg-emerald-500/50 border-emerald-300 text-white'
-                  : 'bg-slate-950/65 border-white/15 text-emerald-300'
-              }`}
-            >
-              ▲
-            </button>
-          </div>
-        </>
-      )}
+      <div className="fixed bottom-3 right-3 z-25 flex items-center gap-2 pointer-events-none">
+        <button
+          type="button"
+          onPointerDown={() => updateTouch({ backward: true })}
+          onPointerUp={() => updateTouch({ backward: false })}
+          onPointerCancel={() => updateTouch({ backward: false })}
+          onPointerLeave={() => updateTouch({ backward: false })}
+          className={`pointer-events-auto min-w-[48px] min-h-[48px] rounded-xl border font-bold text-xs flex items-center justify-center backdrop-blur-md select-none ${
+            touchState.backward
+              ? 'bg-amber-500/45 border-amber-300 text-white'
+              : 'bg-slate-950/65 border-white/15 text-amber-200'
+          }`}
+        >
+          ▼
+        </button>
+        <button
+          type="button"
+          onPointerDown={() => updateTouch({ forward: true })}
+          onPointerUp={() => updateTouch({ forward: false })}
+          onPointerCancel={() => updateTouch({ forward: false })}
+          onPointerLeave={() => updateTouch({ forward: false })}
+          className={`pointer-events-auto min-w-[52px] min-h-[52px] rounded-xl border font-bold text-sm flex items-center justify-center backdrop-blur-md select-none ${
+            touchState.forward
+              ? 'bg-emerald-500/50 border-emerald-300 text-white'
+              : 'bg-slate-950/65 border-white/15 text-emerald-300'
+          }`}
+        >
+          ▲
+        </button>
+      </div>
     </div>
   );
 };
