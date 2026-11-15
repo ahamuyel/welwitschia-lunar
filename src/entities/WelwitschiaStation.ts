@@ -38,9 +38,11 @@ export class WelwitschiaStation {
   private perimeterPointLight!: THREE.PointLight;
   private windowShieldDomeMat!: THREE.MeshBasicMaterial;
 
-  // a) Estação de Suporte de Vida (O2) - Anéis ascendentes e 2 válvulas calibráveis
+  // a) Estação de Suporte de Vida (O2) & Processador Térmico ISRU - Anéis ascendentes, tanque de água azul, vapor e 2 válvulas
   private o2Bubbles: Array<{ mesh: THREE.Mesh; baseY: number; offset: number }> = [];
   private valveMeshes: THREE.Mesh[] = [];
+  private isruWaterTankLevelMesh!: THREE.Mesh;
+  private isruSteamRings: Array<{ mesh: THREE.Mesh; baseY: number; offset: number }> = [];
 
   // b) Estação de Blindagem Solar Kapton - Anéis eletromagnéticos laranja
   private kaptonRings: THREE.Mesh[] = [];
@@ -841,6 +843,8 @@ export class WelwitschiaStation {
 
     const o2Pct = Math.round(resources?.baseOxygen ?? 90);
     const solarPct = Math.round(resources?.baseSolarEnergy ?? 80);
+    const waterPct = Math.round(resources?.water ?? 72);
+    const rawIceKg = Math.round(resources?.rawIce ?? 20);
     const tempC = interior?.cabinTempC ?? 21;
     const paused = !!interior?.labPaused;
     const ghHealthy = interior ? interior.greenhouseHealthy && !paused : true;
@@ -853,13 +857,13 @@ export class WelwitschiaStation {
     let metricSecondary = '';
 
     if (stationKey === 'OXYGEN') {
-      titleText = 'ECLSS // SUPORTE DE VIDA O₂';
-      metricPrimary = `${o2Pct}%`;
-      metricSecondary = `PRESSÃO: 101.3 kPa • TRAJE: ${Math.round(resources?.suitOxygen ?? 90)}%`;
-      if (activeEm?.type === 'OXYGEN_LEAK' || o2Pct < 40) {
+      titleText = 'ISRU // ÁGUA PURA & O₂';
+      metricPrimary = `💧${waterPct}%`;
+      metricSecondary = `💨 O₂: ${o2Pct}% • 🧊 GELO BRUTO: ${rawIceKg}/100kg`;
+      if (activeEm?.type === 'OXYGEN_LEAK' || o2Pct < 40 || waterPct <= 10) {
         statusLabel = 'CRÍTICO';
         primaryColor = '#ef4444';
-      } else if (o2Pct < 65) {
+      } else if (o2Pct < 65 || waterPct < 35) {
         statusLabel = 'ALERTA';
         primaryColor = '#f59e0b';
       } else {
@@ -885,21 +889,21 @@ export class WelwitschiaStation {
     } else if (stationKey === 'GREENHOUSE') {
       titleText = 'HIDROPONIA // WELWITSCHIA MIRABILIS';
       metricPrimary = `${tempC > 0 ? '+' : ''}${tempC}°C`;
-      metricSecondary = `EXT: -173°C a +127°C • FLORA: ${ghHealthy ? 'ÓTIMA' : 'DORMÊNCIA'}`;
-      if (activeEm?.type === 'LUNAR_NIGHT_COLD' || tempC < 5) {
+      metricSecondary = `💧 ÁGUA: ${waterPct}% • FLORA: ${ghHealthy ? 'ÓTIMA' : 'STRESS HÍDRICO'}`;
+      if (activeEm?.type === 'LUNAR_NIGHT_COLD' || tempC < 5 || waterPct <= 0) {
         statusLabel = 'CRÍTICO';
         primaryColor = '#38bdf8';
-      } else if (activeEm?.type === 'GREENHOUSE_DEHYDRATION' || !ghHealthy) {
+      } else if (activeEm?.type === 'GREENHOUSE_DEHYDRATION' || !ghHealthy || waterPct < 30) {
         statusLabel = 'ALERTA';
         primaryColor = '#f59e0b';
       } else {
         primaryColor = '#22c55e';
       }
     } else {
-      const sciencePts = Math.min(60, (interior?.discoveriesUnlocked ?? 0) * 20);
+      const sciencePts = Math.min(100, (interior?.sciencePoints ?? 0) + (interior?.discoveriesUnlocked ?? 0) * 10);
       titleText = 'LAB // ESPECTROGRAFIA ISRU';
-      metricPrimary = `${sciencePts}/60`;
-      metricSecondary = `ALVO: ${interior?.activeHologram ?? 'MOON'} • H₂O POLAR`;
+      metricPrimary = `🔬${sciencePts}`;
+      metricSecondary = `🧊 GELO: ${rawIceKg}kg • 💧 ÁGUA: ${waterPct}%`;
       if (paused) {
         statusLabel = 'ALERTA';
         primaryColor = '#f59e0b';
@@ -1130,6 +1134,50 @@ export class WelwitschiaStation {
         });
       }
     });
+
+    // Tanque Central do Processador Térmico ISRU (Gelo Bruto -> Água Purificada Azul + Vapor)
+    const waterTankGlassGeo = new THREE.CylinderGeometry(0.42, 0.42, 2.4, 20);
+    const waterTankGlassMat = new THREE.MeshPhysicalMaterial({
+      color: 0xbae6fd,
+      transmission: 0.82,
+      transparent: true,
+      opacity: 0.45,
+      roughness: 0.1
+    });
+    const waterTankGlass = new THREE.Mesh(waterTankGlassGeo, waterTankGlassMat);
+    waterTankGlass.position.set(0, 2.1, -0.15);
+    stationGroup.add(waterTankGlass);
+
+    const waterLevelGeo = new THREE.CylinderGeometry(0.36, 0.36, 2.2, 18);
+    const waterLevelMat = new THREE.MeshStandardMaterial({
+      color: 0x0284c7,
+      emissive: 0x0ea5e9,
+      emissiveIntensity: 0.75,
+      roughness: 0.2
+    });
+    this.isruWaterTankLevelMesh = new THREE.Mesh(waterLevelGeo, waterLevelMat);
+    this.isruWaterTankLevelMesh.position.set(0, 2.0, -0.15);
+    stationGroup.add(this.isruWaterTankLevelMesh);
+
+    // Anéis de vapor térmico ascendentes quando o Processador ISRU derrete gelo bruto em água
+    const steamRingGeo = new THREE.TorusGeometry(0.28, 0.035, 8, 18);
+    steamRingGeo.rotateX(Math.PI / 2);
+    const steamRingMat = new THREE.MeshBasicMaterial({
+      color: 0xe0f2fe,
+      transparent: true,
+      opacity: 0.65
+    });
+    for (let s = 0; s < 4; s++) {
+      const sMesh = new THREE.Mesh(steamRingGeo, steamRingMat);
+      sMesh.position.set(0, 3.2 + s * 0.32, -0.15);
+      sMesh.visible = false;
+      stationGroup.add(sMesh);
+      this.isruSteamRings.push({
+        mesh: sMesh,
+        baseY: 3.15,
+        offset: s * 0.25
+      });
+    }
 
     // 2 Válvulas 3D Interativas para Calibração por Olhar (Gaze Fuse 0.85s) durante Fuga de O2
     const valveWheelGeo = new THREE.TorusGeometry(0.38, 0.08, 10, 20);
@@ -1803,6 +1851,23 @@ export class WelwitschiaStation {
       b.mesh.scale.set(scale, scale, 1);
     });
 
+    // 2b. Nível do tanque azul de Água Purificada ISRU e vapor ascendente durante o processamento térmico
+    if (this.isruWaterTankLevelMesh) {
+      const waterFrac = Math.max(0.05, Math.min(1.0, (resources?.water ?? 72) / 100));
+      this.isruWaterTankLevelMesh.scale.y = waterFrac;
+      this.isruWaterTankLevelMesh.position.y = 0.9 + waterFrac * 1.1;
+    }
+    const isProcessingIce = (interior?.isruProcessingTimerSec ?? 0) > 0;
+    this.isruSteamRings.forEach((sr) => {
+      sr.mesh.visible = isProcessingIce;
+      if (isProcessingIce) {
+        const cycle = (time * 1.8 + sr.offset) % 1.0;
+        sr.mesh.position.y = sr.baseY + cycle * 1.35;
+        const sScale = 0.7 + cycle * 1.25;
+        sr.mesh.scale.set(sScale, sScale, 1);
+      }
+    });
+
     // 3. Anéis eletromagnéticos laranja nas bobinas Kapton + brilho protetor / geada nas janelas
     const shieldActive = !!interior?.shieldActive || interior?.activeEmergency?.type === 'SOLAR_STORM';
     this.kaptonRings.forEach((ring, idx) => {
@@ -2043,17 +2108,22 @@ export class WelwitschiaStation {
       energyData.texture.needsUpdate = true;
     }
 
-    // 2. Estação de Suporte de Vida (O2)
+    // 2. Estação de Suporte de Vida (O2) & Processador Térmico ISRU (Gelo Bruto -> Água Purificada)
     const oxygenData = this.terminalRenderers.get('OXYGEN');
     if (oxygenData) {
-      const isComplete = interactions.suitRefilled;
+      const hasRawIce = (resources.rawIce ?? 0) > 0;
+      const isComplete = interactions.suitRefilled && !hasRawIce;
       this.drawTerminalCanvas(
         oxygenData.canvas,
-        '💨 SUPORTE DE VIDA O₂',
-        isComplete ? '✓ PRESSURIZADO' : '👁️ OLHAR 0.8s / TOQUE',
-        `💨 O₂ ${Math.round(resources.baseOxygen)}% • TRAJE ${Math.round(resources.suitOxygen)}%`,
+        hasRawIce ? '🔥 PROCESSADOR TÉRMICO ISRU' : '💨 SUPORTE DE VIDA & ÁGUA',
+        hasRawIce
+          ? `👁️ DERRETER ${Math.round(resources.rawIce)}kg GELO → ÁGUA`
+          : isComplete
+          ? '✓ ÁGUA & O₂ ESTÁVEIS'
+          : '👁️ OLHAR 0.8s / TOQUE',
+        `💧 ÁGUA ${Math.round(resources.water ?? 72)}% • 💨 O₂ ${Math.round(resources.baseOxygen)}%`,
         isComplete,
-        '#00f0ff'
+        hasRawIce ? '#38bdf8' : '#00f0ff'
       );
       oxygenData.texture.needsUpdate = true;
     }
@@ -2067,7 +2137,7 @@ export class WelwitschiaStation {
         briefingData.canvas,
         '🌱 ESTUFA & LAB 3D',
         isComplete ? '👁️ MUDAR HOLOGRAMA' : '👁️ OLHAR 0.8s / TOQUE',
-        `🌡️ ${interior?.cabinTempC ?? 21}°C • 🔬 ${modelLabel}`,
+        `💧 ${Math.round(resources.water ?? 72)}% • 🌡️ ${interior?.cabinTempC ?? 21}°C • 🔬 ${modelLabel}`,
         isComplete,
         '#38bdf8'
       );
@@ -2077,15 +2147,12 @@ export class WelwitschiaStation {
     // 4. Escotilha de Saída (Airlock)
     const airlockData = this.terminalRenderers.get('AIRLOCK');
     if (airlockData) {
-      const canOpen = interactions.energyRedirected && interactions.suitRefilled && interactions.briefingViewed;
       const isComplete = interactions.airlockOpened;
       this.drawTerminalCanvas(
         airlockData.canvas,
         '🚪 SAÍDA EVA // ROVER',
-        canOpen
-          ? isComplete ? '✓ A SAIR...' : '👁️ OLHAR 0.8s P/ SAIR'
-          : '🔒 ATIVE AS 3 ESTAÇÕES',
-        canOpen ? 'ROVER PRONTO' : 'PREPARAR MISSÃO',
+        isComplete ? '✓ A SAIR...' : '👁️ OLHAR 0.8s P/ SAIR EM EVA',
+        `🧊 GELO ${Math.round(resources.rawIce ?? 0)}/100kg • ROVER PRONTO`,
         isComplete,
         '#a855f7'
       );

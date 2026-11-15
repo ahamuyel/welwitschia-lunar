@@ -66,6 +66,12 @@ interface LunarGameCanvasProps {
   onCycleHologram: () => void;
   onNearBaseAirlockChange?: (isNear: boolean) => void;
   onEnterBase?: () => void;
+  onMineIce?: () => void;
+  onProcessIceToWater?: () => void;
+  onReactivateScout?: () => void;
+  onInstallSeismograph?: () => void;
+  onNearIceDepositChange?: (isNear: boolean) => void;
+  onNearSeismographChange?: (isNear: boolean) => void;
   touchDriveInputs?: TouchDriveInputs;
 }
 
@@ -93,11 +99,19 @@ export const LunarGameCanvas: React.FC<LunarGameCanvasProps> = ({
   onCycleHologram,
   onNearBaseAirlockChange,
   onEnterBase,
+  onMineIce,
+  onProcessIceToWater,
+  onReactivateScout,
+  onInstallSeismograph,
+  onNearIceDepositChange,
+  onNearSeismographChange,
   touchDriveInputs
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const isNearRef = useRef<boolean>(false);
   const isNearAirlockRef = useRef<boolean>(false);
+  const isNearIceRef = useRef<boolean>(false);
+  const isNearSeismographRef = useRef<boolean>(false);
   const gameStateRef = useRef<GameState>(gameState);
   const cameraModeRef = useRef<CameraViewMode>(cameraMode);
   const isVRActiveRef = useRef<boolean>(isVRActive);
@@ -215,13 +229,114 @@ export const LunarGameCanvas: React.FC<LunarGameCanvasProps> = ({
 
     const roverPhysics = new RoverPhysics(terrain, roverInitialPos, 0.78);
 
-    // 10. Rover Perdido (LRO-Scout) balanceado para 650m (460.0, y, 460.0)
-    const targetX = 460.0;
-    const targetZ = 460.0;
+    // 10. Missão Paralela A: Rover Perdido (LRO-Scout) numa cratera a ~45m da base (30.0, y, 54.0) com SOS âmbar
+    const targetX = 30.0;
+    const targetZ = 54.0;
     const targetY = terrain.getHeight(targetX, targetZ);
     const lostRover = new LostRover(targetX, targetY, targetZ);
     lostRover.interactionBeacon.userData = { actionId: 'SCOUT_DATA', type: 'scout' };
     scene.add(lostRover.group);
+
+    // 11. Atividade Principal ISRU: Depósito de Gelo Lunar Bruto na Cratera Sombreada (-28.0, y, 48.0)
+    const icePos = new THREE.Vector3(-28.0, terrain.getHeight(-28.0, 48.0), 48.0);
+    const iceDepositGroup = new THREE.Group();
+    iceDepositGroup.position.copy(icePos);
+
+    const iceCrystalMat = new THREE.MeshPhysicalMaterial({
+      color: 0x38bdf8,
+      emissive: 0x0284c7,
+      emissiveIntensity: 0.65,
+      transmission: 0.72,
+      transparent: true,
+      opacity: 0.88,
+      roughness: 0.15
+    });
+    const crystalOffsets = [
+      { x: 0, z: 0, h: 1.55, r: 0.48, rotZ: 0.1 },
+      { x: -0.65, z: 0.35, h: 1.1, r: 0.36, rotZ: -0.25 },
+      { x: 0.6, z: -0.3, h: 1.2, r: 0.38, rotZ: 0.22 },
+      { x: 0.2, z: 0.65, h: 0.9, r: 0.3, rotZ: -0.15 }
+    ];
+    crystalOffsets.forEach((co) => {
+      const cGeo = new THREE.ConeGeometry(co.r, co.h, 6);
+      const cMesh = new THREE.Mesh(cGeo, iceCrystalMat);
+      cMesh.position.set(co.x, co.h * 0.45, co.z);
+      cMesh.rotation.z = co.rotZ;
+      iceDepositGroup.add(cMesh);
+    });
+
+    const iceRingGeo = new THREE.RingGeometry(1.6, 1.95, 32);
+    iceRingGeo.rotateX(-Math.PI / 2);
+    const iceRingMat = new THREE.MeshBasicMaterial({
+      color: 0x38bdf8,
+      side: THREE.DoubleSide,
+      transparent: true,
+      opacity: 0.75
+    });
+    const iceInteractionRing = new THREE.Mesh(iceRingGeo, iceRingMat);
+    iceInteractionRing.position.set(0, 0.14, 0);
+    iceInteractionRing.userData = { actionId: 'MINE_ICE', type: 'ice_deposit' };
+    iceDepositGroup.add(iceInteractionRing);
+
+    const iceLight = new THREE.PointLight(0x38bdf8, 2.4, 14);
+    iceLight.position.set(0, 1.8, 0);
+    iceDepositGroup.add(iceLight);
+    scene.add(iceDepositGroup);
+
+    // 12. Missão Paralela B: Sismógrafo Lunar Artemis na borda elevada da cratera (0.0, y, 66.0)
+    const seismoPos = new THREE.Vector3(0.0, terrain.getHeight(0.0, 66.0), 66.0);
+    const seismographGroup = new THREE.Group();
+    seismographGroup.position.copy(seismoPos);
+
+    // Baliza/Feixe vertical ciano para localizar o ponto de instalação do Sismógrafo
+    const beamGeo = new THREE.CylinderGeometry(0.18, 0.45, 16, 16, 1, true);
+    const beamMat = new THREE.MeshBasicMaterial({
+      color: 0x00f0ff,
+      transparent: true,
+      opacity: 0.22,
+      side: THREE.DoubleSide,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false
+    });
+    const seismoBeam = new THREE.Mesh(beamGeo, beamMat);
+    seismoBeam.position.set(0, 8.0, 0);
+    seismographGroup.add(seismoBeam);
+
+    // Sensor Sísmico Lunar Artemis (cúpula dourada Kapton + 3 pés + antena para Luanda)
+    const domeSensorGeo = new THREE.CylinderGeometry(0.45, 0.58, 0.55, 16);
+    const domeSensorMat = new THREE.MeshStandardMaterial({
+      color: 0xd4af37,
+      metalness: 0.88,
+      roughness: 0.22
+    });
+    const domeSensor = new THREE.Mesh(domeSensorGeo, domeSensorMat);
+    domeSensor.position.set(0, 0.45, 0);
+    seismographGroup.add(domeSensor);
+
+    const seismoRodGeo = new THREE.CylinderGeometry(0.03, 0.04, 1.3, 8);
+    const seismoRod = new THREE.Mesh(seismoRodGeo, domeSensorMat);
+    seismoRod.position.set(0, 1.15, 0);
+    seismographGroup.add(seismoRod);
+
+    const seismoTipGeo = new THREE.SphereGeometry(0.12, 10, 10);
+    const seismoTipMat = new THREE.MeshBasicMaterial({ color: 0x00f0ff });
+    const seismoTip = new THREE.Mesh(seismoTipGeo, seismoTipMat);
+    seismoTip.position.set(0, 1.85, 0);
+    seismographGroup.add(seismoTip);
+
+    const seismoRingGeo = new THREE.RingGeometry(1.5, 1.85, 32);
+    seismoRingGeo.rotateX(-Math.PI / 2);
+    const seismoRingMat = new THREE.MeshBasicMaterial({
+      color: 0x00f0ff,
+      side: THREE.DoubleSide,
+      transparent: true,
+      opacity: 0.75
+    });
+    const seismoInteractionRing = new THREE.Mesh(seismoRingGeo, seismoRingMat);
+    seismoInteractionRing.position.set(0, 0.14, 0);
+    seismoInteractionRing.userData = { actionId: 'INSTALL_SEISMOGRAPH', type: 'seismograph' };
+    seismographGroup.add(seismoInteractionRing);
+    scene.add(seismographGroup);
 
     // Callback de disparo por Gaze Fuse (0.8s) ou Toque Direto
     const handleTriggerAction = (actionId: string) => {
@@ -231,7 +346,11 @@ export const LunarGameCanvas: React.FC<LunarGameCanvasProps> = ({
           onRedirectEnergy();
           break;
         case 'OXYGEN':
-          onRefillSuitOxygen();
+          if ((resourcesRef.current.rawIce ?? 0) > 0 && onProcessIceToWater) {
+            onProcessIceToWater();
+          } else {
+            onRefillSuitOxygen();
+          }
           break;
         case 'BRIEFING':
           onViewBriefing();
@@ -254,8 +373,18 @@ export const LunarGameCanvas: React.FC<LunarGameCanvasProps> = ({
         case 'HOLOGRAM_DISCOVERY':
           onCycleHologram();
           break;
+        case 'MINE_ICE':
+          onMineIce?.();
+          break;
+        case 'INSTALL_SEISMOGRAPH':
+          onInstallSeismograph?.();
+          break;
         case 'SCOUT_DATA':
-          onExtractDataModule();
+          if (onReactivateScout) {
+            onReactivateScout();
+          } else {
+            onExtractDataModule();
+          }
           break;
         case 'ENTER_BASE':
           onEnterBase?.();
@@ -275,7 +404,12 @@ export const LunarGameCanvas: React.FC<LunarGameCanvasProps> = ({
       const interactables: THREE.Object3D[] =
         currentSt === 'STATE_DOME_MANAGEMENT'
           ? station.getInteractiveObjects()
-          : [...station.getExteriorInteractiveObjects(), lostRover.interactionBeacon];
+          : [
+              ...station.getExteriorInteractiveObjects(),
+              lostRover.interactionBeacon,
+              iceInteractionRing,
+              seismoInteractionRing
+            ];
       const clicked = vrManager.performClickRaycast(clientX, clientY, interactables);
       if (clicked?.userData?.actionId) {
         handleTriggerAction(clicked.userData.actionId);
@@ -323,8 +457,16 @@ export const LunarGameCanvas: React.FC<LunarGameCanvasProps> = ({
           onToggleCamera();
           break;
         case 'KeyE':
-          if (isNearRef.current) {
-            onExtractDataModule();
+          if (isNearIceRef.current && onMineIce) {
+            onMineIce();
+          } else if (isNearSeismographRef.current && onInstallSeismograph) {
+            onInstallSeismograph();
+          } else if (isNearRef.current) {
+            if (onReactivateScout) {
+              onReactivateScout();
+            } else {
+              onExtractDataModule();
+            }
           }
           break;
       }
@@ -512,12 +654,37 @@ export const LunarGameCanvas: React.FC<LunarGameCanvasProps> = ({
         skyAndLighting.updateSunShadowTarget(roverPhysics.position);
 
         // Telemetria dupla: Relação com LRO-Scout e com a Base
+        lostRover.setReactivated(!!baseInteriorRef.current.parallelMissionScoutDone);
         const nav = calculateNavTelemetry(roverPhysics.position, lostRover.targetPosition);
 
-        const isNear = nav.distanceToTargetM <= 15;
+        const isNear = nav.distanceToTargetM <= 4.5;
         if (isNear !== isNearRef.current) {
           isNearRef.current = isNear;
           onNearLostRoverChange(isNear);
+        }
+
+        // Proximidade (< 4.8m) ao Depósito de Gelo Lunar Bruto na Cratera Sombreada (-28, 48)
+        const distToIce = Math.hypot(roverPhysics.position.x - icePos.x, roverPhysics.position.z - icePos.z);
+        const isNearIce = distToIce <= 4.8;
+        if (isNearIce !== isNearIceRef.current) {
+          isNearIceRef.current = isNearIce;
+          onNearIceDepositChange?.(isNearIce);
+        }
+
+        // Proximidade (< 4.8m) ao Sismógrafo Lunar Artemis na borda da cratera (0, 66)
+        const distToSeismo = Math.hypot(roverPhysics.position.x - seismoPos.x, roverPhysics.position.z - seismoPos.z);
+        const isNearSeismo = distToSeismo <= 4.8;
+        if (isNearSeismo !== isNearSeismographRef.current) {
+          isNearSeismographRef.current = isNearSeismo;
+          onNearSeismographChange?.(isNearSeismo);
+        }
+
+        // Animação suave dos anéis do Depósito de Gelo e do Sismógrafo Artemis
+        iceInteractionRing.rotation.z = elapsedTime * 0.8;
+        seismoInteractionRing.rotation.z = -elapsedTime * 0.8;
+        if (baseInteriorRef.current.parallelMissionSeismographDone) {
+          seismoTipMat.color.setHex(0x10b981);
+          seismoRingMat.color.setHex(0x10b981);
         }
 
         // Deteção de proximidade (< 4.0m) da porta/escotilha exterior da base Welwitschia (z = 20.2m)
@@ -528,10 +695,12 @@ export const LunarGameCanvas: React.FC<LunarGameCanvasProps> = ({
           onNearBaseAirlockChange?.(isNearAirlock);
         }
 
-        // Foco de olhar Gaze Fuse (0.8s) ativo no exterior para a porta da base e para o LRO-Scout
+        // Foco de olhar Gaze Fuse (0.8s) ativo no exterior para a porta da base, Depósito de Gelo, LRO-Scout e Sismógrafo
         vrManager.updateGaze(delta, [
           ...station.getExteriorInteractiveObjects(),
-          lostRover.interactionBeacon
+          lostRover.interactionBeacon,
+          iceInteractionRing,
+          seismoInteractionRing
         ]);
 
         onUpdateTelemetry({
@@ -552,6 +721,10 @@ export const LunarGameCanvas: React.FC<LunarGameCanvasProps> = ({
           isInStorm: isStorm,
           stormChoiceMade: false,
           isNearLostRover: isNear,
+          isNearIceDeposit: isNearIce,
+          isNearSeismograph: isNearSeismo,
+          distanceToIceDepositM: Math.round(distToIce),
+          distanceToSeismographM: Math.round(distToSeismo),
           highSpeedTimer: roverPhysics.highSpeedDuration,
           cameraMode: currentCameraMode
         });

@@ -18,24 +18,25 @@ export const LunarRadar: React.FC<LunarRadarProps> = ({
   const px = isInsideBase ? 0 : telemetry.coordinates.x;
   const pz = isInsideBase ? 0 : telemetry.coordinates.z;
 
-  // Escala do radar (raio máximo de 700m mapeado em 40px)
-  const scale = 38 / 700;
+  // Escala do radar (raio de 75m mapeado em 38px para localizar Gelo, LRO-Scout a ~45m e Sismógrafo)
+  const scale = 38 / 75;
   const clampCoord = (val: number) => Math.max(-38, Math.min(38, val));
 
-  // Posição relativa da Base Welwitschia (0, 0)
+  // Posição relativa da Porta Airlock da Base Welwitschia (0, 20)
   const baseDx = clampCoord((0 - px) * scale);
-  const baseDz = clampCoord((0 - pz) * scale);
+  const baseDz = clampCoord((20 - pz) * scale);
 
-  // Posição relativa do LRO-Scout / Gelo Lunar (460, 460)
-  const targetDx = clampCoord((460 - px) * scale);
-  const targetDz = clampCoord((460 - pz) * scale);
+  // Posição relativa da Missão Paralela A: Rover Perdido LRO-Scout (30, 54) a ~45m da base
+  const scoutDx = clampCoord((30 - px) * scale);
+  const scoutDz = clampCoord((54 - pz) * scale);
 
-  // Depósitos de gelo / rochas de referência no radar
-  const landmarks = [
-    { x: 180, z: 160, type: 'ice' },
-    { x: 320, z: 290, type: 'rock' },
-    { x: -120, z: 210, type: 'ice' }
-  ];
+  // Posição relativa da Atividade Principal: Depósito de Gelo Bruto (-28, 48)
+  const iceDx = clampCoord((-28 - px) * scale);
+  const iceDz = clampCoord((48 - pz) * scale);
+
+  // Posição relativa da Missão Paralela B: Sismógrafo Lunar Artemis (0, 66)
+  const seismoDx = clampCoord((0 - px) * scale);
+  const seismoDz = clampCoord((66 - pz) * scale);
 
   return (
     <div
@@ -52,27 +53,17 @@ export const LunarRadar: React.FC<LunarRadarProps> = ({
         <line x1="-44" y1="0" x2="44" y2="0" stroke="rgba(56, 189, 248, 0.14)" strokeWidth="1" />
         <line x1="0" y1="-44" x2="0" y2="44" stroke="rgba(56, 189, 248, 0.14)" strokeWidth="1" />
 
-        {/* Depósitos de gelo (azul) e rochas (âmbar) */}
-        {landmarks.map((lm, idx) => {
-          const lx = clampCoord((lm.x - px) * scale);
-          const lz = clampCoord((lm.z - pz) * scale);
-          return (
-            <circle
-              key={idx}
-              cx={lx}
-              cy={-lz}
-              r={lm.type === 'ice' ? 2.2 : 1.8}
-              fill={lm.type === 'ice' ? '#38bdf8' : '#f59e0b'}
-              opacity={0.75}
-            />
-          );
-        })}
+        {/* Depósito de Gelo Lunar Bruto (Azul Gelo #38bdf8) */}
+        <circle cx={iceDx} cy={-iceDz} r="3.2" fill="#38bdf8" stroke="#e0f2fe" strokeWidth="0.9" />
 
-        {/* Base Welwitschia (Ciano/Verde) */}
-        <circle cx={baseDx} cy={-baseDz} r="3.5" fill="#00f0ff" stroke="#ffffff" strokeWidth="1" />
+        {/* Sismógrafo Lunar Artemis (Violeta/Ciano #a855f7) */}
+        <circle cx={seismoDx} cy={-seismoDz} r="3.2" fill="#a855f7" stroke="#f3e8ff" strokeWidth="0.9" />
 
-        {/* Alvo LRO-Scout / Gelo Polar (Verde Esmeralda) */}
-        <circle cx={targetDx} cy={-targetDz} r="3.5" fill="#10b981" stroke="#a7f3d0" strokeWidth="1" />
+        {/* Rover Perdido LRO-Scout a ~45m (Âmbar SOS #f59e0b) */}
+        <circle cx={scoutDx} cy={-scoutDz} r="3.4" fill="#f59e0b" stroke="#fef3c7" strokeWidth="1" />
+
+        {/* Base Welwitschia (Ciano/Verde #10b981) */}
+        <circle cx={baseDx} cy={-baseDz} r="3.6" fill="#10b981" stroke="#ffffff" strokeWidth="1" />
 
         {/* Seta central indicando posição e direção (heading) do jogador */}
         <g transform={`rotate(${telemetry.headingDeg || 0})`}>

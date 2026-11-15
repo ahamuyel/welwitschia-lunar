@@ -15,6 +15,7 @@ export class LostRover {
   public interactionBeacon: THREE.Mesh;
   public targetPosition: THREE.Vector3;
   public roboticArm: THREE.Group;
+  private isReactivated: boolean = false;
 
   constructor(x: number, y: number, z: number) {
     this.group = new THREE.Group();
@@ -139,15 +140,29 @@ export class LostRover {
     this.group.add(this.interactionBeacon);
   }
 
-  /** Atualiza o pulso do LED de emergência e rotação do anel interativo */
+  public setReactivated(active: boolean): void {
+    this.isReactivated = active;
+    if (active) {
+      this.beaconLight.color.setHex(0x10b981);
+      (this.interactionBeacon.material as THREE.MeshBasicMaterial).color.setHex(0x10b981);
+    }
+  }
+
+  /** Atualiza o pulso do LED de emergência SOS âmbar (ou verde após reativado) e rotação do anel interativo */
   public update(time: number): void {
-    const pulse = Math.max(0.1, Math.sin(time * 3.0));
-    this.beaconLight.intensity = pulse * 2.5;
-    (this.beaconLed.material as THREE.MeshBasicMaterial).color.setRGB(
-      0.96 * pulse,
-      0.62 * pulse,
-      0.05 * pulse
-    );
+    if (this.isReactivated) {
+      this.beaconLight.intensity = 2.6;
+      (this.beaconLed.material as THREE.MeshBasicMaterial).color.setHex(0x10b981);
+    } else {
+      // Sinal SOS intermitente âmbar
+      const pulse = Math.sin(time * 5.0) > -0.1 ? 1.0 : 0.12;
+      this.beaconLight.intensity = pulse * 3.2;
+      (this.beaconLed.material as THREE.MeshBasicMaterial).color.setRGB(
+        0.96 * pulse,
+        0.62 * pulse,
+        0.05 * pulse
+      );
+    }
 
     if (this.interactionBeacon) {
       this.interactionBeacon.rotation.z += 0.02;

@@ -22,6 +22,7 @@ interface DomeManagementScreenProps {
   onToggleChat: () => void;
   onRedirectEnergy: () => void;
   onRefillSuitOxygen: () => void;
+  onProcessIceToWater?: () => void;
   onViewBriefing: () => void;
   onOpenAirlock: () => void;
   onTriggerEmergency: (type: BaseEmergencyType) => void;
@@ -44,6 +45,7 @@ export const DomeManagementScreen: React.FC<DomeManagementScreenProps> = ({
   onToggleChat,
   onRedirectEnergy,
   onRefillSuitOxygen,
+  onProcessIceToWater,
   onViewBriefing,
   onOpenAirlock,
   onTriggerEmergency,
@@ -55,14 +57,13 @@ export const DomeManagementScreen: React.FC<DomeManagementScreenProps> = ({
   const [isFullscreen, setIsFullscreen] = useState(!!document.fullscreenElement);
   const [selectedStation, setSelectedStation] = useState<'OXYGEN' | 'SHIELD' | 'GREENHOUSE' | 'LAB'>('OXYGEN');
 
-  const canOpenAirlock =
-    interactions.energyRedirected &&
-    interactions.suitRefilled &&
-    interactions.briefingViewed;
+  const canOpenAirlock = true;
 
   const activeEm = baseInterior.activeEmergency;
   const valveCal = baseInterior.valveCalibration;
-  const scienceScore = Math.min(60, baseInterior.discoveriesUnlocked * 20);
+  const scienceScore = Math.min(100, (baseInterior.sciencePoints ?? 0) + baseInterior.discoveriesUnlocked * 10);
+  const waterPct = Math.round(resources.water ?? 72);
+  const rawIceKg = Math.round(resources.rawIce ?? 0);
 
   useEffect(() => {
     const onFsChange = () => setIsFullscreen(!!document.fullscreenElement);
@@ -117,10 +118,17 @@ export const DomeManagementScreen: React.FC<DomeManagementScreenProps> = ({
         className="w-full flex items-center justify-between pointer-events-none"
         style={{ height: '44px', padding: '0 12px' }}
       >
-        {/* À ESQUERDA: 1 pílula minúscula com apenas 3 ícones essenciais (⚡ 80% | 💨 90% | 🔬 0/60) */}
-        <div className="pointer-events-auto inline-flex items-center gap-2 px-3 min-h-[38px] rounded-full bg-slate-950/70 backdrop-blur-md border border-white/15 shadow-md text-xs font-semibold text-slate-100 whitespace-nowrap">
+        {/* À ESQUERDA: Pílula compacta com recursos essenciais (⚡ Bateria | 💧 Água Purificada | 💨 O2 | 🔬 Ciência) */}
+        <div className="pointer-events-auto inline-flex items-center gap-1.5 sm:gap-2 px-3 min-h-[38px] rounded-full bg-slate-950/75 backdrop-blur-md border border-white/15 shadow-md text-xs font-semibold text-slate-100 whitespace-nowrap">
           <span className={resources.baseSolarEnergy < 30 ? 'text-red-400' : 'text-amber-300'}>
             ⚡ {Math.round(resources.baseSolarEnergy)}%
+          </span>
+          <span className="text-white/25">|</span>
+          <span
+            className={waterPct <= 15 ? 'text-red-400 animate-pulse' : waterPct < 35 ? 'text-amber-300' : 'text-sky-300'}
+            title="Água Purificada ISRU (alimenta Estufa Welwitschia e O₂)"
+          >
+            💧 {waterPct}%
           </span>
           <span className="text-white/25">|</span>
           <span className={resources.baseOxygen < 40 ? 'text-red-400' : 'text-cyan-300'}>
@@ -135,22 +143,17 @@ export const DomeManagementScreen: React.FC<DomeManagementScreenProps> = ({
               onChangeActivePanel('station-detail');
             }}
             className="text-purple-300 hover:text-cyan-200 transition-colors cursor-pointer"
-            title="Ciência & Holograma 3D"
+            title="Ciência & Missões Paralelas"
           >
-            🔬 {scienceScore}/60
+            🔬 {scienceScore}
           </button>
-          <span className="text-white/25">|</span>
-          <span className="text-[11px] font-bold text-emerald-300">
-            <span className="sm:hidden">
-              {baseInterior.narrativeAct === 1 ? 'Ato I' : baseInterior.narrativeAct === 2 ? 'Ato II' : 'Ato III'}
-            </span>
-            <span className="hidden sm:inline">
-              {baseInterior.narrativeAct === 1
-                ? 'Ato I: Shackleton'
-                : baseInterior.narrativeAct === 2
-                ? 'Ato II: Noite Lunar'
-                : 'Ato III: Amanhecer'}
-            </span>
+          <span className="text-white/25 hidden sm:inline">|</span>
+          <span className="hidden sm:inline text-[11px] font-bold text-emerald-300">
+            {baseInterior.narrativeAct === 1
+              ? 'Ato I: Shackleton'
+              : baseInterior.narrativeAct === 2
+              ? 'Ato II: Noite Lunar'
+              : 'Ato III: Amanhecer'}
           </span>
         </div>
 
@@ -255,6 +258,51 @@ export const DomeManagementScreen: React.FC<DomeManagementScreenProps> = ({
                 <span>{isFullscreen ? '🗗' : '⛶'}</span>
                 <span>Tela Cheia</span>
               </button>
+            </div>
+
+            {/* Jornada do Astronauta Júnior: Ciclo Vital ISRU + 2 Missões Paralelas */}
+            <div className="space-y-1.5 pt-1 border-t border-white/10">
+              <span className="block text-[10px] font-bold text-cyan-300 uppercase">
+                Objetivos do Astronauta Júnior
+              </span>
+              <div className="rounded-xl bg-slate-900/90 border border-white/10 p-2.5 space-y-1.5 text-[11px]">
+                <div className="flex items-start justify-between gap-2">
+                  <span className="text-sky-200">
+                    🧊 <b>Ciclo Vital ISRU:</b> Minerar Gelo Bruto nas crateras e purificar em 💧 Água ({waterPct}%)
+                  </span>
+                  <span className="shrink-0 font-bold text-emerald-300">
+                    {baseInterior.iceCyclesCompleted > 0 ? `✓ ${baseInterior.iceCyclesCompleted}x` : `${rawIceKg}kg`}
+                  </span>
+                </div>
+                <div className="flex items-start justify-between gap-2">
+                  <span className={baseInterior.parallelMissionScoutDone ? 'text-emerald-300' : 'text-amber-200'}>
+                    🛰️ <b>Missão A:</b> Reativar Rover LRO-Scout a ~45m (+25 Ciência)
+                  </span>
+                  <span className="shrink-0 font-bold">
+                    {baseInterior.parallelMissionScoutDone ? '✓' : 'Pendente'}
+                  </span>
+                </div>
+                <div className="flex items-start justify-between gap-2">
+                  <span className={baseInterior.parallelMissionSeismographDone ? 'text-emerald-300' : 'text-purple-200'}>
+                    📡 <b>Missão B:</b> Sismógrafo Lunar Artemis na cratera (+25 Ciência)
+                  </span>
+                  <span className="shrink-0 font-bold">
+                    {baseInterior.parallelMissionSeismographDone ? '✓' : 'Pendente'}
+                  </span>
+                </div>
+              </div>
+              {rawIceKg > 0 && onProcessIceToWater && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onProcessIceToWater();
+                    onChangeActivePanel('none');
+                  }}
+                  className="w-full min-h-[42px] px-3 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-black text-xs cursor-pointer shadow-lg"
+                >
+                  🔥 Processar {rawIceKg}kg Gelo Bruto → 💧 Água Purificada
+                </button>
+              )}
             </div>
 
             {/* Estações da Base & Saída EVA */}
@@ -448,17 +496,34 @@ export const DomeManagementScreen: React.FC<DomeManagementScreenProps> = ({
             </div>
             <p className="text-slate-300 leading-relaxed">
               {selectedStation === 'OXYGEN' &&
-                `Pressão de O₂: ${Math.round(resources.baseOxygen)}% • Traje EVA: ${Math.round(resources.suitOxygen)}%. Eletrólise de gelo polar ativa.`}
+                `💧 Água Purificada: ${waterPct}% • 🧊 Gelo Bruto para processar: ${rawIceKg}/100 kg • 💨 Pressão O₂: ${Math.round(resources.baseOxygen)}%. O Processador Térmico ISRU derrete e filtra o gelo das crateras para alimentar a Estufa e o gerador de O₂.`}
               {selectedStation === 'SHIELD' &&
                 `Energia Solar: ${Math.round(resources.baseSolarEnergy)}% • Bateria Rover: ${Math.round(resources.roverBattery)}%. Bobinas Kapton operacionais.`}
               {selectedStation === 'GREENHOUSE' &&
-                `Temperatura da Cabine: ${baseInterior.cabinTempC}°C • Estado da Welwitschia mirabilis: ${
-                  baseInterior.greenhouseHealthy ? 'Verde vibrante' : 'Em modo economia'
+                `Temperatura: ${baseInterior.cabinTempC}°C • 💧 Água: ${waterPct}% • Estado da Welwitschia mirabilis: ${
+                  baseInterior.greenhouseHealthy ? 'Verde vibrante (produzindo O₂)' : 'Stress hídrico / economia'
                 }.`}
               {selectedStation === 'LAB' &&
-                `Holograma ativo: ${baseInterior.activeHologram} • Pontos de Ciência: ${scienceScore}/60.`}
+                `Holograma: ${baseInterior.activeHologram} • 🔬 Ciência: ${scienceScore} pts • Missão A (LRO-Scout): ${
+                  baseInterior.parallelMissionScoutDone ? 'Concluída ✓' : 'A ~45m no Radar'
+                } • Missão B (Sismógrafo): ${
+                  baseInterior.parallelMissionSeismographDone ? 'Concluída ✓' : 'Na borda da cratera'
+                }.`}
             </p>
           </div>
+        </div>
+      )}
+
+      {/* BOTÃO FLUTUANTE DO PROCESSADOR TÉRMICO ISRU (Aparece na base quando há Gelo Bruto recolhido) */}
+      {rawIceKg > 0 && onProcessIceToWater && !activeEm && !valveCal.active && activePanel === 'none' && (
+        <div className="fixed bottom-14 inset-x-0 flex justify-center pointer-events-none px-4 z-25">
+          <button
+            type="button"
+            onClick={onProcessIceToWater}
+            className="pointer-events-auto min-h-[46px] px-5 py-2.5 rounded-full bg-sky-500/95 hover:bg-sky-400 text-slate-950 font-black text-xs sm:text-sm border border-sky-200 shadow-xl backdrop-blur-md cursor-pointer"
+          >
+            🔥 Processador ISRU: Derreter {rawIceKg}kg de Gelo → 💧 Água Pura
+          </button>
         </div>
       )}
 

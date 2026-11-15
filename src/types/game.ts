@@ -73,6 +73,7 @@ export interface BaseInteriorState {
   labPaused: boolean;
   activeHologram: HologramModelType;
   discoveriesUnlocked: number;
+  sciencePoints: number;
   lastDiscoveryTitle: string;
   activeEmergency: BaseEmergencyEvent | null;
   decisionTimeRemaining: number;
@@ -83,6 +84,10 @@ export interface BaseInteriorState {
   narrativeAct: NarrativeActNumber;
   narrativeActTitle: string;
   missionProgressPct: number;
+  isruProcessingTimerSec: number;
+  parallelMissionScoutDone: boolean;
+  parallelMissionSeismographDone: boolean;
+  iceCyclesCompleted: number;
   valveCalibration: ValveCalibrationState;
   sectorPauseTimerSec: number;
   nextAutonomousEventSec: number;
@@ -109,6 +114,10 @@ export interface TelemetryData {
   isInStorm: boolean;
   stormChoiceMade: boolean;
   isNearLostRover: boolean;
+  isNearIceDeposit?: boolean;
+  isNearSeismograph?: boolean;
+  distanceToIceDepositM?: number;
+  distanceToSeismographM?: number;
   highSpeedTimer: number;
   cameraMode: CameraViewMode;
 }
@@ -120,6 +129,8 @@ export interface ResourceState {
   suitOxygen: number;      // 0 - 100%
   roverIntegrity: number;  // 0 - 100%
   marsFuelTank: number;    // 0 - 100%
+  rawIce: number;          // 0 - 100 kg (Gelo Lunar Bruto minerado nas crateras sombreadas)
+  water: number;           // 0 - 100 % (Água Purificada produzida no Processador Térmico ISRU da base)
 }
 
 export interface DomeInteractions {

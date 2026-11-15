@@ -70,9 +70,9 @@ const WELLY_TOAST_MESSAGES: Record<string, { text: string; mood: WellyMood }> = 
 };
 
 const QUICK_SUGGESTIONS: string[] = [
-  'Porque faz -173°C na Lua?',
-  'O que é a Welwitschia?',
-  'Como sobreviver à tempestade solar?'
+  'Como transformar Gelo em Água?',
+  'Quais são as missões paralelas?',
+  'Porque faz -173°C na Lua?'
 ];
 
 let speechDebounceTimer: number | null = null;
@@ -127,6 +127,14 @@ function generateOfflineWellyAnswer(
 ): string {
   const q = question.toLowerCase();
   const actLabel = baseInterior?.narrativeActTitle ?? 'Ato I: Pouso na Cratera Shackleton';
+
+  if (q.includes('gelo') || q.includes('água') || q.includes('agua') || q.includes('isru') || q.includes('purificar') || q.includes('minerar')) {
+    return `[${actLabel}] Na cadeia científica ISRU da NASA, o Gelo Bruto (🧊 ${Math.round(resources.rawIce ?? 0)}/100 kg) que mineramos nas crateras sombreadas vem misturado com poeira lunar! Tens de voltar à base pela porta Airlock e ativar o Processador Térmico ISRU para o derreter e filtrar em Água Purificada (💧 ${Math.round(resources.water ?? 72)}%), que alimenta a Estufa Welwitschia e o gerador de O₂!`;
+  }
+
+  if (q.includes('paralela') || q.includes('objetivo') || q.includes('sismógrafo') || q.includes('sismografo') || q.includes('scout') || q.includes('perdido')) {
+    return `[${actLabel}] Além do Ciclo Vital ISRU (minerar gelo e purificar em água), temos 2 Missões Paralelas lá fora: A) Localizar e reativar a célula solar do rover perdido LRO-Scout a ~45m da base (+25 Ciência), e B) Instalar o Sismógrafo Lunar Artemis na baliza ciano na borda da cratera para medir "moonquakes" (+25 Ciência)!`;
+  }
 
   if (q.includes('-173') || q.includes('frio') || q.includes('noite') || q.includes('temperatura') || q.includes('calor')) {
     return `[${actLabel}] Kandandu pela pergunta! Como a Lua quase não tem atmosfera (exosfera de 10⁻¹² torr), não há ar para guardar o calor. Ao sol faz +127°C e nas crateras escuras do Polo Sul chega a -173°C! Neste momento a nossa cabine está a ${baseInterior?.cabinTempC ?? 21}°C.`;

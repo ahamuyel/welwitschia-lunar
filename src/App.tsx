@@ -36,6 +36,8 @@ export function App() {
   const [isRadarVisible, setIsRadarVisible] = useState<boolean>(false); // Oculto por padrão na base, ativável sob demanda
   const [isChatOpen, setIsChatOpen] = useState<boolean>(false); // Chat com a IA Welly fechado por padrão, sob demanda
   const [isNearBaseAirlock, setIsNearBaseAirlock] = useState<boolean>(false);
+  const [isNearIceDeposit, setIsNearIceDeposit] = useState<boolean>(false);
+  const [isNearSeismograph, setIsNearSeismograph] = useState<boolean>(false);
   const [touchDriveInputs, setTouchDriveInputs] = useState<TouchDriveInputs>({
     forward: false,
     backward: false,
@@ -207,6 +209,30 @@ export function App() {
     setIsNearBaseAirlock(isNear);
   }, []);
 
+  const handleNearIceDepositChange = useCallback((isNear: boolean) => {
+    setIsNearIceDeposit(isNear);
+  }, []);
+
+  const handleNearSeismographChange = useCallback((isNear: boolean) => {
+    setIsNearSeismograph(isNear);
+  }, []);
+
+  const handleMineIce = useCallback(() => {
+    gameStateManager.mineLunarIce();
+  }, []);
+
+  const handleProcessIceToWater = useCallback(() => {
+    gameStateManager.processIceToWater();
+  }, []);
+
+  const handleReactivateScout = useCallback(() => {
+    gameStateManager.reactivateLostScoutRover();
+  }, []);
+
+  const handleInstallSeismograph = useCallback(() => {
+    gameStateManager.installLunarSeismograph();
+  }, []);
+
   const handleEnterBase = useCallback(() => {
     gameStateManager.enterBaseFromExterior();
     setDomeInteractions({ ...gameStateManager.domeInteractions });
@@ -264,7 +290,13 @@ export function App() {
         onRockDamage={handleRockDamage}
         onNearLostRoverChange={handleNearLostRoverChange}
         onNearBaseAirlockChange={handleNearBaseAirlockChange}
+        onNearIceDepositChange={handleNearIceDepositChange}
+        onNearSeismographChange={handleNearSeismographChange}
         onEnterBase={handleEnterBase}
+        onMineIce={handleMineIce}
+        onProcessIceToWater={handleProcessIceToWater}
+        onReactivateScout={handleReactivateScout}
+        onInstallSeismograph={handleInstallSeismograph}
         onExtractDataModule={handleExtractDataModule}
         cameraMode={cameraMode}
         onToggleCamera={handleToggleCamera}
@@ -335,6 +367,7 @@ export function App() {
           onToggleChat={() => setIsChatOpen((prev) => !prev)}
           onRedirectEnergy={handleRedirectEnergy}
           onRefillSuitOxygen={handleRefillSuitOxygen}
+          onProcessIceToWater={handleProcessIceToWater}
           onViewBriefing={handleViewBriefing}
           onOpenAirlock={handleOpenAirlock}
           onTriggerEmergency={handleTriggerEmergency}
@@ -353,6 +386,11 @@ export function App() {
           onToggleHeadlights={handleToggleHeadlights}
           onToggleCamera={handleToggleCamera}
           onExtractData={isNearLostRover ? handleExtractDataModule : undefined}
+          onReactivateScout={isNearLostRover ? handleReactivateScout : undefined}
+          onMineIce={handleMineIce}
+          onInstallSeismograph={handleInstallSeismograph}
+          isNearIceDeposit={isNearIceDeposit}
+          isNearSeismograph={isNearSeismograph}
           isNearBaseAirlock={isNearBaseAirlock}
           onEnterBase={handleEnterBase}
           isVRActive={isVRActive}

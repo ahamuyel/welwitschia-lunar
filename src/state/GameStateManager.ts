@@ -156,10 +156,12 @@ export class GameStateManager {
   public resources: ResourceState = {
     baseSolarEnergy: 80,
     baseOxygen: 90,
-    roverBattery: 80,
-    suitOxygen: 90,
+    roverBattery: 85,
+    suitOxygen: 95,
     roverIntegrity: 100,
-    marsFuelTank: 0
+    marsFuelTank: 0,
+    rawIce: 20,
+    water: 72
   };
 
   public domeInteractions: DomeInteractions = {
@@ -179,6 +181,7 @@ export class GameStateManager {
     labPaused: false,
     activeHologram: 'MOON',
     discoveriesUnlocked: 0,
+    sciencePoints: 0,
     lastDiscoveryTitle: '',
     activeEmergency: null,
     decisionTimeRemaining: 16,
@@ -189,6 +192,10 @@ export class GameStateManager {
     narrativeAct: 1,
     narrativeActTitle: 'Ato I: Pouso na Cratera Shackleton',
     missionProgressPct: 12,
+    isruProcessingTimerSec: 0,
+    parallelMissionScoutDone: false,
+    parallelMissionSeismographDone: false,
+    iceCyclesCompleted: 0,
     valveCalibration: {
       active: false,
       timeRemainingSec: 12,
@@ -206,9 +213,9 @@ export class GameStateManager {
 
   public cameraMode: CameraViewMode = 'THIRD_PERSON';
 
-  // Alvo do Rover Perdido LRO-Scout (650m a 045° NE - 460m, 460m)
-  public readonly targetCoordinates = { x: 460.0, y: 0, z: 460.0 };
-  public readonly targetDistanceM: number = 650;
+  // Alvo do Rover Perdido LRO-Scout (~45m da porta Airlock da base - cratera a NE)
+  public readonly targetCoordinates = { x: 30.0, y: 0, z: 54.0 };
+  public readonly targetDistanceM: number = 45;
 
   // Estado da tempestade de micrometeoritos
   public stormDilemmaTriggered: boolean = false;
@@ -614,9 +621,10 @@ export class GameStateManager {
     this.notifyBaseInterior();
   }
 
-  public unlockDiscovery(model: HologramModelType, title: string): void {
+  public unlockDiscovery(model: HologramModelType, title: string, bonusPoints: number = 10): void {
     this.baseInterior.activeHologram = model;
     this.baseInterior.discoveriesUnlocked += 1;
+    this.baseInterior.sciencePoints = Math.min(100, this.baseInterior.sciencePoints + bonusPoints);
     this.baseInterior.lastDiscoveryTitle = title;
     this.baseInterior.labPaused = false;
   }
@@ -629,23 +637,145 @@ export class GameStateManager {
     ];
     const currentIdx = order.findIndex(o => o.model === this.baseInterior.activeHologram);
     const next = order[(currentIdx + 1) % order.length];
-    this.unlockDiscovery(next.model, next.title);
+    this.unlockDiscovery(next.model, next.title, 5);
     this.viewBriefing();
     soundManager.playSuccessChime();
     this.notifyBaseInterior();
   }
 
+  // --- CADEIA CIENTÍFICA ISRU (GELO BRUTO -> ÁGUA PURIFICADA) & MISSÕES PARALELAS ---
+
+  /**
+   * Minera Gelo Lunar Bruto (rawIce, em kg) nos depósitos das crateras sombreadas no exterior (máx 100 kg).
+   */
+  public mineLunarIce(): boolean {
+    if (this.resources.rawIce >= 100) {
+      soundManager.playUiBeep(520, 0.12);
+      return false;
+    }
+    this.resources.rawIce = Math.min(100, this.resources.rawIce + 50);
+    this.baseInterior.lastConsequenceFeedback = {
+      title: `🧊 Gelo Lunar Bruto Recolhido (${Math.round(this.resources.rawIce)}/100 kg)`,
+      choiceLabel: 'Mineração Cratera Sombreada',
+      scientificReason:
+        'O gelo nas crateras de sombra permanente mistura-se com regolito. Precisa de filtragem e fusão térmica no Módulo ISRU antes de virar água!',
+      wellyNarrativeQuote:
+        'Boa! Recolheste gelo congelado da cratera. Agora volta à base pela porta Airlock para o derreter e purificar em água!',
+      isPositive: true
+    };
+    soundManager.playSuccessChime();
+    this.updateNarrativeActProgress();
+    this.notifyResources();
+    this.notifyBaseInterior();
+    return true;
+  }
+
+  /**
+   * Processador Térmico ISRU dentro da base: converte Gelo Bruto (rawIce kg) em Água Purificada (water %)
+   * consumindo um pouco de bateria, com animação de vapor e enchimento do tanque azul.
+   */
+  public processIceToWater(): boolean {
+    if (this.resources.rawIce <= 0) {
+      soundManager.playUiBeep(440, 0.12);
+      return false;
+    }
+
+    const iceUsedKg = this.resources.rawIce;
+    const waterProducedPct = Math.max(20, Math.round(iceUsedKg * 0.75));
+    this.resources.rawIce = 0;
+    this.resources.water = Math.min(100, this.resources.water + waterProducedPct);
+    this.resources.baseSolarEnergy = Math.max(15, this.resources.baseSolarEnergy - 6);
+    this.resources.baseOxygen = Math.min(100, this.resources.baseOxygen + 12);
+    this.resources.suitOxygen = 100;
+    this.domeInteractions.suitRefilled = true;
+
+    this.baseInterior.isruProcessingTimerSec = 5.5;
+    this.baseInterior.iceCyclesCompleted += 1;
+    this.baseInterior.greenhouseHealthy = true;
+    this.unlockDiscovery('ICE_CRYSTAL', 'Fusão Térmica & Destilação ISRU (Gelo Bruto → H₂O Pura)', 10);
+
+    this.baseInterior.lastConsequenceFeedback = {
+      title: `💧 Processador Térmico ISRU: +${waterProducedPct}% Água Purificada`,
+      choiceLabel: `Processados ${Math.round(iceUsedKg)} kg de Gelo Bruto (-6% Bateria)`,
+      scientificReason:
+        'Na cadeia ISRU da NASA, o regolito gelado é aquecido e destilado no reator térmico para separar poeira tóxica e obter H₂O pura para a Estufa e eletrólise de O₂!',
+      wellyNarrativeQuote:
+        'Espetáculo, Comandante Júnior! Derretemos e filtrámos o gelo da cratera em Água Purificada! A Welwitschia e o gerador de O₂ já estão a todo o vapor!',
+      isPositive: true
+    };
+
+    soundManager.playSuccessChime();
+    this.updateNarrativeActProgress();
+    this.notifyResources();
+    this.notifyBaseInterior();
+    return true;
+  }
+
+  /**
+   * Missão Paralela A — Localizar e Reativar o Rover Perdido (LRO-Scout) a ~45m da base (+25 Ciência).
+   */
+  public reactivateLostScoutRover(): boolean {
+    if (!this.baseInterior.parallelMissionScoutDone) {
+      this.baseInterior.parallelMissionScoutDone = true;
+      this.baseInterior.sciencePoints = Math.min(100, this.baseInterior.sciencePoints + 25);
+      this.baseInterior.discoveriesUnlocked += 1;
+      this.baseInterior.lastDiscoveryTitle = 'Telemetria LRO-Scout Restaurada (+25 Ciência)';
+    }
+    this.baseInterior.lastConsequenceFeedback = {
+      title: '🛰️ Missão Paralela A Concluída: LRO-Scout Reativado (+25 Ciência)',
+      choiceLabel: 'Célula Solar Reconectada',
+      scientificReason:
+        'Ao limpar o regolito e reconectar a célula fotovoltaica do LRO-Scout, recuperámos o mapeamento de neutrões de hidrogénio da cratera!',
+      wellyNarrativeQuote:
+        'Kandandu, Astronauta Júnior! Reconectaste a célula solar do rover perdido LRO-Scout e ganhaste +25 Ciência! A telemetria dele voltou a brilhar!',
+      isPositive: true
+    };
+    soundManager.playSuccessChime();
+    this.updateNarrativeActProgress();
+    this.notifyResources();
+    this.notifyBaseInterior();
+    return true;
+  }
+
+  /**
+   * Missão Paralela B — Instalar Sismógrafo Lunar Artemis na borda elevada da cratera (+25 Ciência).
+   */
+  public installLunarSeismograph(): boolean {
+    if (!this.baseInterior.parallelMissionSeismographDone) {
+      this.baseInterior.parallelMissionSeismographDone = true;
+      this.baseInterior.sciencePoints = Math.min(100, this.baseInterior.sciencePoints + 25);
+      this.baseInterior.discoveriesUnlocked += 1;
+      this.baseInterior.lastDiscoveryTitle = 'Sismógrafo Lunar Artemis Ativo (+25 Ciência)';
+    }
+    this.baseInterior.lastConsequenceFeedback = {
+      title: '📡 Missão Paralela B Concluída: Sismógrafo Artemis (+25 Ciência)',
+      choiceLabel: 'Sensor Sísmico Ativado na Cratera',
+      scientificReason:
+        'Os sismos lunares ("moonquakes") ajudam os cientistas a estudar o núcleo da Lua e a segurança estrutural das futuras bases Artemis!',
+      wellyNarrativeQuote:
+        'Brilhante! O Sismógrafo Lunar Artemis já está a medir "moonquakes" na borda da cratera e a enviar os sinais direto para Luanda (+25 Ciência)!',
+      isPositive: true
+    };
+    soundManager.playSuccessChime();
+    this.updateNarrativeActProgress();
+    this.notifyResources();
+    this.notifyBaseInterior();
+    return true;
+  }
+
   public updateNarrativeActProgress(distanceToTargetM?: number): void {
     let pct = 10;
-    if (this.domeInteractions.energyRedirected) pct += 10;
-    if (this.domeInteractions.suitRefilled) pct += 10;
-    if (this.domeInteractions.briefingViewed) pct += 10;
-    pct += Math.min(24, this.decisionsResolvedCount * 8);
-    pct += Math.min(16, this.baseInterior.discoveriesUnlocked * 5);
+    if (this.domeInteractions.energyRedirected) pct += 8;
+    if (this.domeInteractions.suitRefilled) pct += 8;
+    if (this.domeInteractions.briefingViewed) pct += 8;
+    pct += Math.min(20, this.decisionsResolvedCount * 7);
+    pct += Math.min(20, this.baseInterior.iceCyclesCompleted * 12);
+    if (this.baseInterior.parallelMissionScoutDone) pct += 18;
+    if (this.baseInterior.parallelMissionSeismographDone) pct += 18;
 
-    if (typeof distanceToTargetM === 'number' && distanceToTargetM < 650) {
-      const evaProgress = Math.max(0, Math.min(1, (650 - distanceToTargetM) / 650));
-      pct = Math.max(pct, Math.round(35 + evaProgress * 60));
+    if (typeof distanceToTargetM === 'number' && distanceToTargetM < 45) {
+      const evaProgress = Math.max(0, Math.min(1, (45 - distanceToTargetM) / 45));
+      pct = Math.max(pct, Math.round(28 + evaProgress * 25));
     }
     if (this.dataModuleExtracted || this.currentState === 'STATE_RESCUE_AND_ISRU') {
       pct = 100;
@@ -670,6 +800,44 @@ export class GameStateManager {
     if (this.currentState !== 'STATE_DOME_MANAGEMENT') return;
 
     let changed = false;
+    let resourcesChanged = false;
+
+    // 0. Ciclo ISRU em tempo real: A Estufa Welwitschia e o gerador de O2 consomem Água Purificada (water) continuamente
+    if (this.baseInterior.isruProcessingTimerSec > 0) {
+      this.baseInterior.isruProcessingTimerSec = Math.max(0, this.baseInterior.isruProcessingTimerSec - delta);
+      changed = true;
+    }
+
+    const prevWater = Math.round(this.resources.water);
+    const prevO2 = Math.round(this.resources.baseOxygen);
+    this.resources.water = Math.max(0, this.resources.water - 0.16 * delta);
+
+    if (this.resources.water <= 0.1) {
+      // Stress hídrico: Welwitschia murcha e produção de O2 cai
+      if (this.baseInterior.greenhouseHealthy) {
+        this.baseInterior.greenhouseHealthy = false;
+        changed = true;
+      }
+      this.resources.baseOxygen = Math.max(15, this.resources.baseOxygen - 0.18 * delta);
+    } else {
+      if (
+        !this.baseInterior.greenhouseHealthy &&
+        this.baseInterior.sectorPauseTimerSec <= 0 &&
+        this.baseInterior.activeSideEffect !== 'GREENHOUSE_WILT' &&
+        this.baseInterior.activeEmergency?.type !== 'LUNAR_NIGHT_COLD' &&
+        this.baseInterior.activeEmergency?.type !== 'GREENHOUSE_DEHYDRATION'
+      ) {
+        this.baseInterior.greenhouseHealthy = true;
+        changed = true;
+      }
+      if (!this.baseInterior.activeEmergency) {
+        this.resources.baseOxygen = Math.min(100, this.resources.baseOxygen + 0.06 * delta);
+      }
+    }
+
+    if (Math.round(this.resources.water) !== prevWater || Math.round(this.resources.baseOxygen) !== prevO2) {
+      resourcesChanged = true;
+    }
 
     // 1. Temporizador de pausa temporária de setores (Estufa / Laboratório) após escolhas táticas
     if (this.baseInterior.sectorPauseTimerSec > 0) {
@@ -793,6 +961,10 @@ export class GameStateManager {
       }
     }
 
+    if (resourcesChanged) {
+      this.notifyResources();
+    }
+
     if (changed) {
       this.notifyBaseInterior();
     }
@@ -829,7 +1001,7 @@ export class GameStateManager {
   public viewBriefing(): void {
     if (!this.domeInteractions.briefingViewed) {
       this.domeInteractions.briefingViewed = true;
-      this.unlockDiscovery('MOON', 'Topografia Polar de Shackleton (Lua)');
+      this.unlockDiscovery('MOON', 'Topografia Polar de Shackleton (Lua)', 5);
     } else {
       this.cycleHologramDiscovery();
     }
@@ -838,22 +1010,21 @@ export class GameStateManager {
   }
 
   public canOpenAirlock(): boolean {
-    return this.domeInteractions.energyRedirected &&
-           this.domeInteractions.suitRefilled &&
-           this.domeInteractions.briefingViewed;
+    return true;
   }
 
   public openAirlock(): boolean {
-    if (!this.canOpenAirlock()) return false;
-
+    this.domeInteractions.energyRedirected = true;
+    this.domeInteractions.suitRefilled = true;
+    this.domeInteractions.briefingViewed = true;
     this.domeInteractions.airlockOpened = true;
     soundManager.playAirlockDepressurization();
 
-    // Transição de 2 segundos para completar a despressurização
+    // Transição de 1.8 segundos para completar a despressurização
     setTimeout(() => {
       this.setState('STATE_ROVER_EXPLORATION');
       soundManager.startMotor();
-    }, 2200);
+    }, 1800);
 
     return true;
   }
@@ -890,6 +1061,13 @@ export class GameStateManager {
       batteryDrain += 0.008 * delta;
     }
     this.resources.roverBattery = Math.max(0, this.resources.roverBattery - batteryDrain);
+
+    // 3. Consumo contínuo de Água Purificada na Estufa Welwitschia enquanto em EVA
+    this.resources.water = Math.max(0, this.resources.water - 0.06 * delta);
+    if (this.resources.water <= 0.1) {
+      this.baseInterior.greenhouseHealthy = false;
+      this.resources.baseOxygen = Math.max(15, this.resources.baseOxygen - 0.08 * delta);
+    }
 
     this.notifyResources();
 
@@ -936,7 +1114,7 @@ export class GameStateManager {
       this.notifyBaseInterior();
     }
 
-    if (distance <= 220 && !this.stormDilemmaTriggered && this.currentState === 'STATE_ROVER_EXPLORATION') {
+    if (distance <= 18 && !this.stormDilemmaTriggered && this.currentState === 'STATE_ROVER_EXPLORATION') {
       this.stormDilemmaTriggered = true;
       this.setState('STATE_STORM_DILEMMA');
       soundManager.startSonar(distance);
@@ -945,8 +1123,8 @@ export class GameStateManager {
     if (this.currentState === 'STATE_STORM_DILEMMA' && this.stormModeInstrumentAdvancing) {
       soundManager.updateSonarDistance(distance);
 
-      // Ao chegar a 60m do alvo, a poeira assenta e o GPS retorna
-      if (distance <= 60 && !this.stormClearedAt60m) {
+      // Ao chegar a 8m do alvo, a poeira assenta e o GPS retorna
+      if (distance <= 8 && !this.stormClearedAt60m) {
         this.stormClearedAt60m = true;
         soundManager.stopSonar();
         soundManager.playSuccessChime();
@@ -972,6 +1150,7 @@ export class GameStateManager {
   // --- RESGATE E ELETRÓLISE ISRU (ESTADO 5) ---
 
   public extractDataModule(): void {
+    this.reactivateLostScoutRover();
     this.dataModuleExtracted = true;
     soundManager.stopMotor();
     soundManager.stopSonar();
@@ -997,13 +1176,13 @@ export class GameStateManager {
           title: 'Navegador por Instrumentos',
           description: 'Cruzou a tempestade de micrometeoritos guiando-se estritamente pela bússola e sonar.',
           icon: '🧭',
-          unlocked: this.stormModeInstrumentAdvancing
+          unlocked: this.stormModeInstrumentAdvancing || this.baseInterior.parallelMissionScoutDone
         },
         {
           id: 'badge-isru',
           title: 'Engenheiro ISRU',
-          description: 'Transformou gelo lunar escuro em propelente líquido criogênico (H₂ e O₂) para o foguete.',
-          icon: '⚡',
+          description: 'Minerou gelo bruto lunar e purificou-o em água limpa para a Welwitschia e O₂.',
+          icon: '💧',
           unlocked: true
         }
       ]
@@ -1020,10 +1199,12 @@ export class GameStateManager {
     this.resources = {
       baseSolarEnergy: 80,
       baseOxygen: 90,
-      roverBattery: 80,
-      suitOxygen: 90,
+      roverBattery: 85,
+      suitOxygen: 95,
       roverIntegrity: 100,
-      marsFuelTank: 0
+      marsFuelTank: 0,
+      rawIce: 20,
+      water: 72
     };
     this.domeInteractions = {
       energyRedirected: false,
@@ -1041,6 +1222,7 @@ export class GameStateManager {
       labPaused: false,
       activeHologram: 'MOON',
       discoveriesUnlocked: 0,
+      sciencePoints: 0,
       lastDiscoveryTitle: '',
       activeEmergency: null,
       decisionTimeRemaining: 16,
@@ -1051,6 +1233,10 @@ export class GameStateManager {
       narrativeAct: 1,
       narrativeActTitle: 'Ato I: Pouso na Cratera Shackleton',
       missionProgressPct: 12,
+      isruProcessingTimerSec: 0,
+      parallelMissionScoutDone: false,
+      parallelMissionSeismographDone: false,
+      iceCyclesCompleted: 0,
       valveCalibration: {
         active: false,
         timeRemainingSec: 12,

@@ -11,6 +11,11 @@ interface RoverHUDProps {
   onToggleHeadlights: () => void;
   onToggleCamera: () => void;
   onExtractData?: () => void;
+  onMineIce?: () => void;
+  onReactivateScout?: () => void;
+  onInstallSeismograph?: () => void;
+  isNearIceDeposit?: boolean;
+  isNearSeismograph?: boolean;
   isNearBaseAirlock?: boolean;
   onEnterBase?: () => void;
   isVRActive: boolean;
@@ -30,6 +35,11 @@ export const RoverHUD: React.FC<RoverHUDProps> = ({
   onToggleHeadlights,
   onToggleCamera,
   onExtractData,
+  onMineIce,
+  onReactivateScout,
+  onInstallSeismograph,
+  isNearIceDeposit,
+  isNearSeismograph,
   isNearBaseAirlock,
   onEnterBase,
   isVRActive,
@@ -95,31 +105,22 @@ export const RoverHUD: React.FC<RoverHUDProps> = ({
         className="w-full flex items-center justify-between pointer-events-none"
         style={{ height: '44px', padding: '0 12px' }}
       >
-        {/* À ESQUERDA: Pílula com 3 ícones essenciais + Indicador discreto do Ato Narrativo */}
-        <div className="pointer-events-none inline-flex items-center gap-2 px-3 min-h-[38px] rounded-full bg-slate-950/70 backdrop-blur-md border border-white/15 shadow-md text-xs font-semibold text-slate-100 whitespace-nowrap">
+        {/* À ESQUERDA: Pílula compacta em EVA com ⚡ Bateria | 🧊 Gelo Bruto (kg) | 💨 O₂ | 📍 Distância */}
+        <div className="pointer-events-none inline-flex items-center gap-1.5 sm:gap-2 px-3 min-h-[38px] rounded-full bg-slate-950/75 backdrop-blur-md border border-white/15 shadow-md text-xs font-semibold text-slate-100 whitespace-nowrap">
           <span className={resources.roverBattery < 25 ? 'text-red-400' : 'text-amber-300'}>
             ⚡ {Math.round(resources.roverBattery)}%
+          </span>
+          <span className="text-white/25">|</span>
+          <span className="text-sky-300 font-bold" title="Gelo Lunar Bruto na mochila/rover (máx 100 kg)">
+            🧊 {Math.round(resources.rawIce ?? 0)}/100kg
           </span>
           <span className="text-white/25">|</span>
           <span className={resources.suitOxygen < 30 ? 'text-red-400' : 'text-cyan-300'}>
             💨 {Math.round(resources.suitOxygen)}%
           </span>
-          <span className="text-white/25">|</span>
-          <span className="text-emerald-300">
-            📍 {Math.round(telemetry.distanceToTargetM)}m
-          </span>
-          <span className="text-white/25">|</span>
-          <span className="text-[11px] font-bold text-cyan-300">
-            <span className="sm:hidden">
-              {telemetry.distanceToTargetM > 430 ? 'Ato I' : telemetry.distanceToTargetM > 160 ? 'Ato II' : 'Ato III'}
-            </span>
-            <span className="hidden sm:inline">
-              {telemetry.distanceToTargetM > 430
-                ? 'Ato I: Shackleton'
-                : telemetry.distanceToTargetM > 160
-                ? 'Ato II: Noite Lunar'
-                : 'Ato III: Amanhecer'}
-            </span>
+          <span className="text-white/25 hidden sm:inline">|</span>
+          <span className="hidden sm:inline text-emerald-300">
+            📍 LRO {Math.round(telemetry.distanceToTargetM)}m
           </span>
         </div>
 
@@ -237,6 +238,29 @@ export const RoverHUD: React.FC<RoverHUDProps> = ({
                 {isFullscreen ? '🗗 Sair' : '⛶ Tela Cheia'}
               </button>
             </div>
+            <div className="space-y-1.5 pt-1 border-t border-white/10 text-[11px]">
+              <span className="block text-[10px] font-bold text-cyan-300 uppercase">
+                Alvos no Exterior Lunar (EVA)
+              </span>
+              <div className="rounded-xl bg-slate-900/90 border border-white/10 p-2.5 space-y-1">
+                <div className="flex justify-between">
+                  <span className="text-sky-200">🧊 Cratera de Gelo Bruto</span>
+                  <span className="font-bold text-sky-300">{telemetry.distanceToIceDepositM ?? 39}m</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-amber-200">🛰️ Missão A: LRO-Scout</span>
+                  <span className="font-bold text-amber-300">{Math.round(telemetry.distanceToTargetM)}m</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-purple-200">📡 Missão B: Sismógrafo</span>
+                  <span className="font-bold text-purple-300">{telemetry.distanceToSeismographM ?? 46}m</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-emerald-200">🚪 Porta Airlock Base</span>
+                  <span className="font-bold text-emerald-300">{Math.round(telemetry.distanceToBaseM)}m</span>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -249,20 +273,46 @@ export const RoverHUD: React.FC<RoverHUDProps> = ({
             onClick={onEnterBase}
             className="pointer-events-auto min-h-[46px] px-6 py-2.5 rounded-full bg-cyan-500/90 hover:bg-cyan-400 text-slate-950 font-black text-xs sm:text-sm border border-cyan-200 shadow-xl backdrop-blur-md cursor-pointer"
           >
-            🚪 Entrar na Base
+            🚪 Entrar na Base {resources.rawIce > 0 ? `(Purificar ${Math.round(resources.rawIce)}kg Gelo)` : ''}
           </button>
         </div>
       )}
 
-      {/* BOTÃO DE EXTRAÇÃO DO MÓDULO LRO-SCOUT */}
-      {onExtractData && (
+      {/* BOTÃO FLUTUANTE DE MINERAÇÃO DE GELO BRUTO NA CRATERA SOMBREADA (< 4.8m) */}
+      {isNearIceDeposit && onMineIce && !isNearBaseAirlock && (
         <div className="fixed bottom-16 inset-x-0 flex justify-center pointer-events-none px-4 z-25">
           <button
             type="button"
-            onClick={onExtractData}
-            className="pointer-events-auto min-h-[44px] px-5 py-2.5 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs sm:text-sm border border-emerald-300 shadow-xl backdrop-blur-md cursor-pointer"
+            onClick={onMineIce}
+            className="pointer-events-auto min-h-[46px] px-5 py-2.5 rounded-full bg-sky-500/95 hover:bg-sky-400 text-slate-950 font-black text-xs sm:text-sm border border-sky-200 shadow-xl backdrop-blur-md cursor-pointer"
           >
-            📡 Extrair Dados de Gelo Lunar (Olhar 0.8s ou Toque)
+            ⛏️ Minerar Gelo Lunar Bruto ({Math.round(resources.rawIce ?? 0)}/100 kg)
+          </button>
+        </div>
+      )}
+
+      {/* BOTÃO DA MISSÃO PARALELA B: SISMÓGRAFO LUNAR ARTEMIS (< 4.8m) */}
+      {isNearSeismograph && onInstallSeismograph && !isNearBaseAirlock && (
+        <div className="fixed bottom-16 inset-x-0 flex justify-center pointer-events-none px-4 z-25">
+          <button
+            type="button"
+            onClick={onInstallSeismograph}
+            className="pointer-events-auto min-h-[46px] px-5 py-2.5 rounded-full bg-purple-600/95 hover:bg-purple-500 text-white font-black text-xs sm:text-sm border border-purple-300 shadow-xl backdrop-blur-md cursor-pointer"
+          >
+            📡 Ativar Sismógrafo Lunar Artemis (+25 Ciência)
+          </button>
+        </div>
+      )}
+
+      {/* BOTÃO DA MISSÃO PARALELA A: REATIVAR ROVER PERDIDO LRO-SCOUT (< 4.5m) */}
+      {(onReactivateScout || onExtractData) && (
+        <div className="fixed bottom-16 inset-x-0 flex justify-center pointer-events-none px-4 z-25">
+          <button
+            type="button"
+            onClick={onReactivateScout || onExtractData}
+            className="pointer-events-auto min-h-[46px] px-5 py-2.5 rounded-full bg-amber-500/95 hover:bg-amber-400 text-slate-950 font-black text-xs sm:text-sm border border-amber-200 shadow-xl backdrop-blur-md cursor-pointer"
+          >
+            🔋 Reativar Célula Solar LRO-Scout (+25 Ciência)
           </button>
         </div>
       )}
