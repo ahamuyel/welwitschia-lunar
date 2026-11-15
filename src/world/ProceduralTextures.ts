@@ -1,0 +1,252 @@
+/**
+ * Welwitschia Lunar - Gerador de Texturas Procedurais em Canvas
+ * 100% Offline-First: Sem necessidade de carregar imagens externas via rede.
+ */
+
+import * as THREE from 'three';
+
+/** Gera textura do lado diurno da Terra vista do horizonte do Polo Sul Lunar */
+export function createEarthDayTexture(): THREE.CanvasTexture {
+  const canvas = document.createElement('canvas');
+  canvas.width = 1024;
+  canvas.height = 512;
+  const ctx = canvas.getContext('2d')!;
+
+  // 1. Oceanos azuis profundos e vibrantes
+  const oceanGrad = ctx.createLinearGradient(0, 0, 0, 512);
+  oceanGrad.addColorStop(0, '#0d2b45');
+  oceanGrad.addColorStop(0.3, '#104f7a');
+  oceanGrad.addColorStop(0.7, '#0b3954');
+  oceanGrad.addColorStop(1, '#071f33');
+  ctx.fillStyle = oceanGrad;
+  ctx.fillRect(0, 0, 1024, 512);
+
+  // Áreas costeiras mais rasas (turquesa sutil)
+  ctx.fillStyle = 'rgba(32, 178, 170, 0.25)';
+  const drawShallows = (cx: number, cy: number, w: number, h: number) => {
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, w, h, 0, 0, Math.PI * 2);
+    ctx.fill();
+  };
+  drawShallows(520, 260, 105, 130);
+  drawShallows(720, 180, 150, 115);
+  drawShallows(260, 190, 100, 95);
+  drawShallows(330, 350, 80, 120);
+
+  // 2. Continentes procedurais estilizados
+  ctx.fillStyle = '#2e5a27'; // Verde floresta / estepe
+  const drawContinent = (cx: number, cy: number, w: number, h: number, seed: number) => {
+    ctx.beginPath();
+    for (let a = 0; a < Math.PI * 2; a += 0.12) {
+      const rOffset = Math.sin(a * 5 + seed) * 18 + Math.cos(a * 9 + seed) * 10;
+      const rx = (w / 2 + rOffset) * Math.cos(a);
+      const ry = (h / 2 + rOffset) * Math.sin(a);
+      const px = cx + rx;
+      const py = cy + ry;
+      if (a === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+    ctx.fill();
+  };
+
+  // África e Península Arábica
+  drawContinent(520, 260, 180, 230, 1.2);
+  // Áreas desérticas do Saara e Namibe em ocre dourado
+  ctx.fillStyle = '#bfa15f';
+  drawContinent(515, 210, 130, 80, 2.1);
+  drawContinent(535, 330, 55, 60, 1.8);
+
+  // Continente Asiático / Eurásia
+  ctx.fillStyle = '#355e3b';
+  drawContinent(720, 180, 260, 200, 2.7);
+
+  // Américas (Norte e Sul)
+  ctx.fillStyle = '#2c532d';
+  drawContinent(260, 190, 170, 160, 3.5);
+  drawContinent(330, 350, 130, 210, 4.1);
+
+  // Austrália
+  ctx.fillStyle = '#a0522d';
+  drawContinent(840, 370, 100, 75, 5.3);
+
+  // 3. Calotas Polares (Ártico e Antártica)
+  ctx.fillStyle = '#f8fafc';
+  ctx.fillRect(0, 0, 1024, 38);
+  ctx.fillRect(0, 474, 1024, 38);
+
+  // 4. Turbilhões e faixas de nuvens atmosféricas brancas
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.55)';
+  for (let y = 50; y < 460; y += 40) {
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    for (let x = 0; x <= 1024; x += 25) {
+      const ny = y + Math.sin(x * 0.02 + y * 0.05) * 20 + Math.cos(x * 0.045) * 14;
+      ctx.lineTo(x, ny);
+    }
+    ctx.lineTo(1024, y + 22);
+    ctx.lineTo(0, y + 22);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.ClampToEdgeWrapping;
+  return texture;
+}
+
+/** Gera textura do lado noturno da Terra (com luzes pontuais de cidades) */
+export function createEarthNightTexture(): THREE.CanvasTexture {
+  const canvas = document.createElement('canvas');
+  canvas.width = 1024;
+  canvas.height = 512;
+  const ctx = canvas.getContext('2d')!;
+
+  // Escuridão total dos oceanos
+  ctx.fillStyle = '#020408';
+  ctx.fillRect(0, 0, 1024, 512);
+
+  // Luzes das cidades (clusters de luz dourada/âmbar suave)
+  const drawCityLights = (cx: number, cy: number, count: number, radius: number) => {
+    for (let i = 0; i < count; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const r = Math.pow(Math.random(), 0.5) * radius;
+      const x = cx + Math.cos(angle) * r;
+      const y = cy + Math.sin(angle) * r;
+      const intensity = Math.random() * 0.8 + 0.2;
+
+      ctx.fillStyle = `rgba(255, 214, 120, ${intensity})`;
+      ctx.fillRect(x, y, 1.5, 1.5);
+    }
+  };
+
+  // Luzes da Europa, América do Norte e Ásia Oriental
+  drawCityLights(500, 170, 200, 50); // Europa
+  drawCityLights(270, 180, 250, 60); // Costa Leste EUA
+  drawCityLights(780, 210, 280, 70); // Ásia Oriental / Japão
+  drawCityLights(530, 360, 80, 30);  // África do Sul / Namíbia
+  drawCityLights(340, 370, 90, 35);  // Costa Sudeste Brasil
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.ClampToEdgeWrapping;
+  return texture;
+}
+
+/** Gera mapa de relevo/bump procedural de ALTA FREQUÊNCIA para o regolito lunar */
+export function createHighResRegolithBumpMap(): THREE.CanvasTexture {
+  const canvas = document.createElement('canvas');
+  canvas.width = 1024;
+  canvas.height = 1024;
+  const ctx = canvas.getContext('2d')!;
+
+  // Base cinza 128 (neutro para bump mapping)
+  ctx.fillStyle = '#808080';
+  ctx.fillRect(0, 0, 1024, 1024);
+
+  const imgData = ctx.getImageData(0, 0, 1024, 1024);
+  const data = imgData.data;
+
+  // Ruído per-pixel de alta frequência para regolito pulverizado
+  for (let i = 0; i < data.length; i += 4) {
+    const grain = (Math.random() - 0.5) * 55;
+    const val = Math.min(255, Math.max(0, 128 + grain));
+    data[i] = val;
+    data[i + 1] = val;
+    data[i + 2] = val;
+  }
+  ctx.putImageData(imgData, 0, 0);
+
+  // Micro-crateras de impacto aleatórias com sombras e bordas iluminadas
+  for (let c = 0; c < 450; c++) {
+    const cx = Math.random() * 1024;
+    const cy = Math.random() * 1024;
+    const cr = 2 + Math.random() * 9;
+
+    const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, cr);
+    grad.addColorStop(0, '#2b2b2b');
+    grad.addColorStop(0.65, '#5c5c5c');
+    grad.addColorStop(1, '#b8b8b8');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(cx, cy, cr, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Marcas sutis de pedriscos e micro-ejetos lineares
+  ctx.strokeStyle = '#404040';
+  ctx.lineWidth = 1;
+  for (let l = 0; l < 80; l++) {
+    const x1 = Math.random() * 1024;
+    const y1 = Math.random() * 1024;
+    const len = 4 + Math.random() * 12;
+    const angle = Math.random() * Math.PI * 2;
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x1 + Math.cos(angle) * len, y1 + Math.sin(angle) * len);
+    ctx.stroke();
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.RepeatWrapping;
+  texture.repeat.set(100, 100);
+  return texture;
+}
+
+/** Gera textura para os painéis solares verticais (com ou sem poeira eletrostática) */
+export function createSolarPanelTexture(dusty: boolean = false): THREE.CanvasTexture {
+  const canvas = document.createElement('canvas');
+  canvas.width = 256;
+  canvas.height = 512;
+  const ctx = canvas.getContext('2d')!;
+
+  // Células fotovoltaicas de silício azul escuro
+  ctx.fillStyle = dusty ? '#2e3845' : '#0a1d37';
+  ctx.fillRect(0, 0, 256, 512);
+
+  // Grade condutora dourada/prateada
+  ctx.strokeStyle = dusty ? '#5a626a' : '#d4af37';
+  ctx.lineWidth = 2;
+
+  const rows = 16;
+  const cols = 6;
+  const rh = 512 / rows;
+  const cw = 256 / cols;
+
+  for (let r = 0; r <= rows; r++) {
+    ctx.beginPath();
+    ctx.moveTo(0, r * rh);
+    ctx.lineTo(256, r * rh);
+    ctx.stroke();
+  }
+
+  for (let c = 0; c <= cols; c++) {
+    ctx.beginPath();
+    ctx.moveTo(c * cw, 0);
+    ctx.lineTo(c * cw, 512);
+    ctx.stroke();
+  }
+
+  // Poeira de regolito
+  if (dusty) {
+    ctx.fillStyle = 'rgba(120, 125, 130, 0.65)';
+    ctx.fillRect(0, 0, 256, 512);
+
+    for (let i = 0; i < 40; i++) {
+      const x = Math.random() * 256;
+      const y = Math.random() * 512;
+      const r = 20 + Math.random() * 50;
+      const grad = ctx.createRadialGradient(x, y, 0, x, y, r);
+      grad.addColorStop(0, 'rgba(150, 155, 160, 0.85)');
+      grad.addColorStop(1, 'rgba(100, 105, 110, 0)');
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  return new THREE.CanvasTexture(canvas);
+}
