@@ -27,10 +27,15 @@ export class PlayerRover {
 
   public leftHeadlight!: THREE.SpotLight;
   public rightHeadlight!: THREE.SpotLight;
+  public auxFrontFloodLight!: THREE.SpotLight;
   public leftLightTarget!: THREE.Object3D;
   public rightLightTarget!: THREE.Object3D;
+  public auxLightTarget!: THREE.Object3D;
   public leftLightCone!: THREE.Mesh;
   public rightLightCone!: THREE.Mesh;
+  public auxLedBarMat!: THREE.MeshBasicMaterial;
+  public mastCyanBeaconMat!: THREE.MeshBasicMaterial;
+  public rearAmberBeaconMats: THREE.MeshBasicMaterial[] = [];
   public brakeLights: THREE.Mesh[] = [];
   public dishAntenna!: THREE.Group;
   public cockpitCameraNode: THREE.Object3D;
@@ -272,6 +277,17 @@ export class PlayerRover {
     rightEye.position.set(0.12, 0, 0.12);
     this.mastcamHead.add(rightEye);
 
+    // Baliza superior ciano de navegação no mastro de sensores (visibilidade noturna lunar)
+    this.mastCyanBeaconMat = new THREE.MeshBasicMaterial({ color: 0x00f0ff });
+    const mastBeaconGeo = new THREE.CylinderGeometry(0.06, 0.06, 0.12, 12);
+    const mastBeacon = new THREE.Mesh(mastBeaconGeo, this.mastCyanBeaconMat);
+    mastBeacon.position.set(0, 0.16, 0);
+    this.mastcamHead.add(mastBeacon);
+
+    const mastPointLight = new THREE.PointLight(0x00f0ff, 1.4, 9, 1.5);
+    mastPointLight.position.set(0, 0.22, 0);
+    this.mastcamHead.add(mastPointLight);
+
     mastcamGroup.add(this.mastcamHead);
     this.chassisGroup.add(mastcamGroup);
   }
@@ -386,31 +402,73 @@ export class PlayerRover {
     dish.rotation.x = -Math.PI * 0.35;
     antennaGroup.add(dish);
 
+    // Ponteira luminosa ciano no mastro da antena parabólica
+    const tipGeo = new THREE.SphereGeometry(0.055, 10, 10);
+    const tipMat = new THREE.MeshBasicMaterial({ color: 0x00f0ff });
+    const tip = new THREE.Mesh(tipGeo, tipMat);
+    tip.position.set(0, 0.56, 0.12);
+    antennaGroup.add(tip);
+
     return antennaGroup;
   }
 
+  /**
+   * Gera textura de feixe volumétrico com gradiente longitudinal suave para visibilidade na poeira lunar.
+   */
+  private createVolumetricBeamTexture(): THREE.CanvasTexture {
+    const canvas = document.createElement('canvas');
+    canvas.width = 64;
+    canvas.height = 256;
+    const ctx = canvas.getContext('2d')!;
+
+    const grad = ctx.createLinearGradient(0, 0, 0, 256);
+    grad.addColorStop(0.0, 'rgba(224, 242, 254, 0.85)');
+    grad.addColorStop(0.35, 'rgba(125, 211, 252, 0.38)');
+    grad.addColorStop(0.75, 'rgba(56, 189, 248, 0.12)');
+    grad.addColorStop(1.0, 'rgba(14, 165, 233, 0.0)');
+
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, 64, 256);
+
+    return new THREE.CanvasTexture(canvas);
+  }
+
   private buildHeadlights(): void {
-    this.leftHeadlight = new THREE.SpotLight(0xffffff, 5.5, 95, Math.PI * 0.22, 0.35, 1.2);
+    // 1. Faróis Frontais Duplos de Alta Potência (SpotLight com ângulo focalizado, penumbra suave e sombras)
+    this.leftHeadlight = new THREE.SpotLight(0xf8fafc, 9.5, 130, Math.PI * 0.24, 0.55, 1.05);
     this.leftHeadlight.position.set(-0.85, 1.05, 2.15);
     this.leftHeadlight.castShadow = true;
     this.leftHeadlight.shadow.bias = -0.0005;
 
-    this.rightHeadlight = new THREE.SpotLight(0xffffff, 5.5, 95, Math.PI * 0.22, 0.35, 1.2);
+    this.rightHeadlight = new THREE.SpotLight(0xf8fafc, 9.5, 130, Math.PI * 0.24, 0.55, 1.05);
     this.rightHeadlight.position.set(0.85, 1.05, 2.15);
     this.rightHeadlight.castShadow = true;
     this.rightHeadlight.shadow.bias = -0.0005;
 
     this.leftLightTarget = new THREE.Object3D();
-    this.leftLightTarget.position.set(-0.85, 0.2, 35.0);
+    this.leftLightTarget.position.set(-0.85, 0.15, 42.0);
 
     this.rightLightTarget = new THREE.Object3D();
-    this.rightLightTarget.position.set(0.85, 0.2, 35.0);
+    this.rightLightTarget.position.set(0.85, 0.15, 42.0);
 
     this.leftHeadlight.target = this.leftLightTarget;
     this.rightHeadlight.target = this.rightLightTarget;
 
+    // 2. Barra de LED Auxiliar Frontal Branca-Fria (ilumina terreno próximo, rochas e gelo)
+    this.auxLedBarMat = new THREE.MeshBasicMaterial({ color: 0xe0f2fe });
+    const auxBarGeo = new THREE.BoxGeometry(1.38, 0.09, 0.08);
+    const auxBarMesh = new THREE.Mesh(auxBarGeo, this.auxLedBarMat);
+    auxBarMesh.position.set(0, 0.88, 2.34);
+    this.chassisGroup.add(auxBarMesh);
+
+    this.auxFrontFloodLight = new THREE.SpotLight(0xe0f2fe, 5.2, 52, Math.PI * 0.44, 0.68, 1.15);
+    this.auxFrontFloodLight.position.set(0, 0.92, 2.35);
+    this.auxLightTarget = new THREE.Object3D();
+    this.auxLightTarget.position.set(0, -0.35, 16.0);
+    this.auxFrontFloodLight.target = this.auxLightTarget;
+
     // Lentes LED frontais emissivas
-    const lensGeo = new THREE.CylinderGeometry(0.14, 0.14, 0.08, 16);
+    const lensGeo = new THREE.CylinderGeometry(0.15, 0.15, 0.08, 16);
     lensGeo.rotateX(Math.PI / 2);
     const lensMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
 
@@ -422,34 +480,40 @@ export class PlayerRover {
     rightLens.position.set(0.85, 1.05, 2.15);
     this.chassisGroup.add(rightLens);
 
-    // Cones volumétricos translúcidos
-    const coneGeo = new THREE.ConeGeometry(3.5, 30, 16, 1, true);
+    // 3. Cones de Feixe Volumétrico Translúcido com Gradiente e AdditiveBlending
+    const beamTexture = this.createVolumetricBeamTexture();
+    const coneGeo = new THREE.ConeGeometry(4.2, 34, 24, 1, true);
     coneGeo.rotateX(Math.PI / 2);
     const coneMat = new THREE.MeshBasicMaterial({
-      color: 0x93c5fd,
+      map: beamTexture,
+      color: 0xbae6fd,
       transparent: true,
-      opacity: 0.09,
+      opacity: 0.24,
+      blending: THREE.AdditiveBlending,
       side: THREE.DoubleSide,
       depthWrite: false
     });
 
     this.leftLightCone = new THREE.Mesh(coneGeo, coneMat);
-    this.leftLightCone.position.set(-0.85, 0.65, 17);
+    this.leftLightCone.position.set(-0.85, 0.62, 19.0);
 
     this.rightLightCone = new THREE.Mesh(coneGeo, coneMat);
-    this.rightLightCone.position.set(0.85, 0.65, 17);
+    this.rightLightCone.position.set(0.85, 0.62, 19.0);
 
     this.group.add(this.leftHeadlight);
     this.group.add(this.rightHeadlight);
+    this.group.add(this.auxFrontFloodLight);
     this.group.add(this.leftLightTarget);
     this.group.add(this.rightLightTarget);
+    this.group.add(this.auxLightTarget);
     this.group.add(this.leftLightCone);
     this.group.add(this.rightLightCone);
   }
 
   private buildBrakeLights(): void {
-    const lightGeo = new THREE.BoxGeometry(0.35, 0.14, 0.08);
-    const brakeMat = new THREE.MeshBasicMaterial({ color: 0x7f1d1d });
+    // Lanternas traseiras vermelhas + balizas de navegação âmbar laterais
+    const lightGeo = new THREE.BoxGeometry(0.38, 0.15, 0.08);
+    const brakeMat = new THREE.MeshBasicMaterial({ color: 0xdc2626 });
 
     const leftBrake = new THREE.Mesh(lightGeo, brakeMat.clone());
     leftBrake.position.set(-0.95, 0.9, -1.98);
@@ -460,6 +524,21 @@ export class PlayerRover {
     rightBrake.position.set(0.95, 0.9, -1.98);
     this.chassisGroup.add(rightBrake);
     this.brakeLights.push(rightBrake);
+
+    // Luzes de navegação traseiras âmbar nas extremidades superiores do chassi
+    const amberGeo = new THREE.BoxGeometry(0.18, 0.1, 0.08);
+    [-1.02, 1.02].forEach((ax) => {
+      const amberMat = new THREE.MeshBasicMaterial({ color: 0xf59e0b });
+      const amberMesh = new THREE.Mesh(amberGeo, amberMat);
+      amberMesh.position.set(ax, 1.15, -1.96);
+      this.chassisGroup.add(amberMesh);
+      this.rearAmberBeaconMats.push(amberMat);
+    });
+
+    // Luz pontual traseira vermelha/âmbar para destacar o Rover na escuridão lunar
+    const rearNavLight = new THREE.PointLight(0xef4444, 1.6, 10, 1.4);
+    rearNavLight.position.set(0, 1.0, -2.25);
+    this.chassisGroup.add(rearNavLight);
   }
 
   /** Atualiza o ângulo de esterçamento das rodas dianteiras e traseiras e a rotação do manche/câmera */
@@ -491,10 +570,45 @@ export class PlayerRover {
 
   public setHeadlights(on: boolean): void {
     this.isHeadlightsOn = on;
-    this.leftHeadlight.intensity = on ? 5.5 : 0.0;
-    this.rightHeadlight.intensity = on ? 5.5 : 0.0;
+    this.leftHeadlight.intensity = on ? 9.5 : 0.0;
+    this.rightHeadlight.intensity = on ? 9.5 : 0.0;
+    if (this.auxFrontFloodLight) {
+      this.auxFrontFloodLight.intensity = on ? 5.2 : 0.0;
+    }
+    if (this.auxLedBarMat) {
+      this.auxLedBarMat.color.setHex(on ? 0xe0f2fe : 0x334155);
+    }
     this.leftLightCone.visible = on;
     this.rightLightCone.visible = on;
+  }
+
+  /**
+   * Intensifica automaticamente os faróis, a barra de LED frontal e as balizas
+   * durante a noite lunar, tempestades ou em regiões sombreadas de crateras.
+   */
+  public updateLightingEnvironment(time: number, isShadowedOrNight: boolean): void {
+    if (this.isHeadlightsOn) {
+      const boost = isShadowedOrNight ? 1.48 : 1.0;
+      this.leftHeadlight.intensity = 9.5 * boost;
+      this.rightHeadlight.intensity = 9.5 * boost;
+      if (this.auxFrontFloodLight) {
+        this.auxFrontFloodLight.intensity = 5.2 * boost;
+      }
+      const coneMat = this.leftLightCone.material as THREE.MeshBasicMaterial;
+      if (coneMat) {
+        coneMat.opacity = isShadowedOrNight ? 0.34 : 0.22;
+      }
+    }
+
+    // Pulso das balizas ciano do mastro e âmbar traseiras na noite lunar
+    const beaconPulse = 0.65 + 0.35 * Math.sin(time * 4.5);
+    if (this.mastCyanBeaconMat) {
+      this.mastCyanBeaconMat.color.setRGB(0, 0.94 * beaconPulse, 1.0 * beaconPulse);
+    }
+    this.rearAmberBeaconMats.forEach((mat, idx) => {
+      const p = 0.6 + 0.4 * Math.sin(time * 3.8 + idx * Math.PI);
+      mat.color.setRGB(0.96 * p, 0.62 * p, 0.05 * p);
+    });
   }
 
   public toggleHeadlights(): boolean {

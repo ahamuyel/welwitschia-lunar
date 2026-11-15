@@ -28,6 +28,23 @@ export type BaseEmergencyType =
 
 export type HologramModelType = 'MOON' | 'EARTH' | 'ICE_CRYSTAL';
 
+export type BaseSideEffectType =
+  | 'NONE'
+  | 'POWER_DIMMING'
+  | 'HULL_SPARKS_SHAKE'
+  | 'GREENHOUSE_WILT'
+  | 'EVA_O2_DRAIN'
+  | 'INDECISION_ALARM';
+
+export type NarrativeActNumber = 1 | 2 | 3;
+
+export interface BaseEmergencyOption {
+  label: string;
+  costText: string;
+  gainText: string;
+  sacrificeText: string;
+}
+
 export interface BaseEmergencyEvent {
   type: BaseEmergencyType;
   title: string;
@@ -35,14 +52,8 @@ export interface BaseEmergencyEvent {
   stationName: string;
   description: string;
   ledState: BaseLedState;
-  optionA: {
-    label: string;
-    costText: string;
-  };
-  optionB: {
-    label: string;
-    costText: string;
-  };
+  optionA: BaseEmergencyOption;
+  optionB: BaseEmergencyOption;
 }
 
 export interface ValveCalibrationState {
@@ -64,12 +75,21 @@ export interface BaseInteriorState {
   discoveriesUnlocked: number;
   lastDiscoveryTitle: string;
   activeEmergency: BaseEmergencyEvent | null;
+  decisionTimeRemaining: number;
+  decisionMaxTime: number;
+  activeSideEffect: BaseSideEffectType;
+  sideEffectTimerSec: number;
+  evaExtraO2DrainActive: boolean;
+  narrativeAct: NarrativeActNumber;
+  narrativeActTitle: string;
+  missionProgressPct: number;
   valveCalibration: ValveCalibrationState;
   sectorPauseTimerSec: number;
   nextAutonomousEventSec: number;
   lastConsequenceFeedback: {
     title: string;
     scientificReason: string;
+    wellyNarrativeQuote: string;
     choiceLabel: string;
     isPositive: boolean;
   } | null;

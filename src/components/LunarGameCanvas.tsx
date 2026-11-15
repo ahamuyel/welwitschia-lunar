@@ -426,10 +426,15 @@ export const LunarGameCanvas: React.FC<LunarGameCanvasProps> = ({
         playerRover.group.quaternion.copy(roverPhysics.orientationQuaternion);
       } else if (currentGameState === 'STATE_DOME_MANAGEMENT') {
         // --- INTERIOR DA BASE EM REALIDADE VIRTUAL / 360° (CÓDIGO DO EDGAR) ---
-        // Trepidação leve da cabine em emergências ativas
-        const isEmergencyActive = baseInteriorRef.current.ledState === 'EMERGENCY';
-        const shakeX = isEmergencyActive ? Math.sin(elapsedTime * 28.0) * 0.018 : 0;
-        const shakeY = isEmergencyActive ? Math.cos(elapsedTime * 34.0) * 0.015 : 0;
+        // Trepidação da cabine em emergências ativas, sacrifício de integridade (HULL_SPARKS_SHAKE) ou Falha por Indecisão
+        const sideEf = baseInteriorRef.current.activeSideEffect;
+        const isShakeActive =
+          baseInteriorRef.current.ledState === 'EMERGENCY' ||
+          sideEf === 'HULL_SPARKS_SHAKE' ||
+          sideEf === 'INDECISION_ALARM';
+        const shakeAmp = sideEf === 'INDECISION_ALARM' ? 0.035 : 0.022;
+        const shakeX = isShakeActive ? Math.sin(elapsedTime * 32.0) * shakeAmp : 0;
+        const shakeY = isShakeActive ? Math.cos(elapsedTime * 38.0) * (shakeAmp * 0.85) : 0;
 
         // Posição de primeira pessoa no centro de comando da cúpula
         camera.position.set(shakeX, baseAltitude + 2.3 + shakeY, 0);
@@ -490,10 +495,15 @@ export const LunarGameCanvas: React.FC<LunarGameCanvasProps> = ({
         playerRover.group.position.copy(roverPhysics.position);
         playerRover.group.quaternion.copy(roverPhysics.orientationQuaternion);
 
-        // Rotação das rodas, esterçamento e luzes de freio
+        // Rotação das rodas, esterçamento, luzes de freio e intensificação automática na noite lunar / sombras
         playerRover.rotateWheels((roverPhysics.currentSpeedKmh / 3.6) * delta);
         playerRover.updateSteering(mergedInputs.left ? 1 : mergedInputs.right ? -1 : 0, speedKmh, delta);
         playerRover.setBraking(mergedInputs.brake);
+        const isShadowedOrNight =
+          isStorm ||
+          roverPhysics.position.y < -1.0 ||
+          baseInteriorRef.current.narrativeAct === 2;
+        playerRover.updateLightingEnvironment(elapsedTime, isShadowedOrNight);
 
         // Áudio procedural do motor modulado pela velocidade
         soundManager.updateMotorSpeed(speedKmh, mergedInputs.forward);

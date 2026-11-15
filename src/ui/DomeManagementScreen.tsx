@@ -139,6 +139,19 @@ export const DomeManagementScreen: React.FC<DomeManagementScreenProps> = ({
           >
             🔬 {scienceScore}/60
           </button>
+          <span className="text-white/25">|</span>
+          <span className="text-[11px] font-bold text-emerald-300">
+            <span className="sm:hidden">
+              {baseInterior.narrativeAct === 1 ? 'Ato I' : baseInterior.narrativeAct === 2 ? 'Ato II' : 'Ato III'}
+            </span>
+            <span className="hidden sm:inline">
+              {baseInterior.narrativeAct === 1
+                ? 'Ato I: Shackleton'
+                : baseInterior.narrativeAct === 2
+                ? 'Ato II: Noite Lunar'
+                : 'Ato III: Amanhecer'}
+            </span>
+          </span>
         </div>
 
         {/* À DIREITA: botões compactos (VR / 360°, 🧭 Radar e ☰) com área de toque mínima 44x44px e gap-2 */}
@@ -208,7 +221,12 @@ export const DomeManagementScreen: React.FC<DomeManagementScreenProps> = ({
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between border-b border-white/10 pb-2">
-              <span className="font-bold text-cyan-300 tracking-wide">MENU DA ESTAÇÃO</span>
+              <div>
+                <span className="block font-bold text-cyan-300 tracking-wide">MENU DA ESTAÇÃO</span>
+                <span className="block text-[10px] font-semibold text-emerald-300">
+                  {baseInterior.narrativeActTitle} ({baseInterior.missionProgressPct}%)
+                </span>
+              </div>
               <button
                 type="button"
                 onClick={() => onChangeActivePanel('none')}
@@ -444,15 +462,55 @@ export const DomeManagementScreen: React.FC<DomeManagementScreenProps> = ({
         </div>
       )}
 
-      {/* 4. CARTÕES DE DECISÃO TÁTICA (Só renderizam quando activePanel === 'decision' e há emergência ativa) */}
+      {/* 4. CARTÕES DE DECISÃO TÁTICA COM TIMER DE URGÊNCIA (16s -> 0s) E GANHO vs SACRIFÍCIO */}
       {activePanel === 'decision' && activeEm && !valveCal.active && (() => {
         const cardA = formatDecisionCard('A', activeEm.optionA.label, activeEm.optionA.costText);
         const cardB = formatDecisionCard('B', activeEm.optionB.label, activeEm.optionB.costText);
+        const timeLeft = Math.max(0, baseInterior.decisionTimeRemaining);
+        const maxTime = Math.max(1, baseInterior.decisionMaxTime || 16);
+        const pct = Math.min(100, Math.max(0, (timeLeft / maxTime) * 100));
+        const isCritical = timeLeft <= 5.0;
+        const isWarning = timeLeft > 5.0 && timeLeft <= 8.0;
+
+        const timerTextColor = isCritical
+          ? 'text-red-200 animate-pulse'
+          : isWarning
+          ? 'text-amber-200'
+          : 'text-cyan-200';
+        const timerBarColor = isCritical
+          ? 'bg-red-500 animate-pulse'
+          : isWarning
+          ? 'bg-amber-400'
+          : 'bg-cyan-400';
+        const headerBorderColor = isCritical
+          ? 'border-red-500/80 bg-red-950/90'
+          : isWarning
+          ? 'border-amber-400/70 bg-amber-950/90'
+          : 'border-cyan-400/60 bg-slate-950/90';
+
         return (
           <div className="fixed bottom-3 inset-x-0 px-3 flex flex-col items-center gap-2 pointer-events-none z-30">
-            <div className="px-3 py-1 rounded-full bg-red-950/85 backdrop-blur-md border border-red-400/50 text-xs font-bold text-red-100">
-              ⚠️ {activeEm.title}
+            {/* Topo do Cartão: Título da Emergência + Contador Numérico Grande + Barra de Progresso Decrescente */}
+            <div
+              className={`w-full max-w-lg rounded-2xl backdrop-blur-md border px-3.5 py-2 shadow-2xl ${headerBorderColor}`}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-extrabold text-white truncate">
+                  ⚠️ {activeEm.title}
+                </span>
+                <span className={`text-sm sm:text-base font-black tabular-nums shrink-0 ${timerTextColor}`}>
+                  ⏱️ {Math.ceil(timeLeft)}s
+                </span>
+              </div>
+              <div className="w-full h-2 rounded-full bg-slate-900/90 overflow-hidden mt-1.5 border border-white/10">
+                <div
+                  className={`h-full transition-all duration-100 ${timerBarColor}`}
+                  style={{ width: `${pct}%` }}
+                />
+              </div>
             </div>
+
+            {/* 2 Cartões de Escolha com GANHO (Verde) e SACRIFÍCIO (Âmbar/Vermelho) */}
             <div className="pointer-events-none grid grid-cols-2 gap-2.5 w-full max-w-lg">
               <button
                 type="button"
@@ -460,13 +518,16 @@ export const DomeManagementScreen: React.FC<DomeManagementScreenProps> = ({
                   onResolveEmergencyChoice('A');
                   onChangeActivePanel('none');
                 }}
-                className="pointer-events-auto min-h-[60px] p-3 rounded-2xl bg-slate-950/88 hover:bg-cyan-950/80 backdrop-blur-md border border-cyan-400/60 shadow-xl flex flex-col items-center justify-center text-center cursor-pointer"
+                className="pointer-events-auto min-h-[78px] p-2.5 rounded-2xl bg-slate-950/92 hover:bg-cyan-950/85 backdrop-blur-md border border-cyan-400/65 shadow-xl flex flex-col items-center justify-center text-center cursor-pointer gap-0.5"
               >
-                <span className="text-xs sm:text-sm font-extrabold text-cyan-200 leading-tight">
+                <span className="text-xs font-extrabold text-cyan-100 leading-tight">
                   {cardA.icon} {cardA.title}
                 </span>
-                <span className="text-[11px] font-semibold text-cyan-300/90 mt-0.5">
-                  {cardA.effect}
+                <span className="text-[11px] font-bold text-emerald-300 leading-tight">
+                  {activeEm.optionA.gainText}
+                </span>
+                <span className="text-[11px] font-bold text-amber-300 leading-tight">
+                  {activeEm.optionA.sacrificeText}
                 </span>
               </button>
 
@@ -476,13 +537,16 @@ export const DomeManagementScreen: React.FC<DomeManagementScreenProps> = ({
                   onResolveEmergencyChoice('B');
                   onChangeActivePanel('none');
                 }}
-                className="pointer-events-auto min-h-[60px] p-3 rounded-2xl bg-slate-950/88 hover:bg-amber-950/80 backdrop-blur-md border border-amber-400/60 shadow-xl flex flex-col items-center justify-center text-center cursor-pointer"
+                className="pointer-events-auto min-h-[78px] p-2.5 rounded-2xl bg-slate-950/92 hover:bg-amber-950/85 backdrop-blur-md border border-amber-400/65 shadow-xl flex flex-col items-center justify-center text-center cursor-pointer gap-0.5"
               >
-                <span className="text-xs sm:text-sm font-extrabold text-amber-200 leading-tight">
+                <span className="text-xs font-extrabold text-amber-100 leading-tight">
                   {cardB.icon} {cardB.title}
                 </span>
-                <span className="text-[11px] font-semibold text-amber-300/90 mt-0.5">
-                  {cardB.effect}
+                <span className="text-[11px] font-bold text-emerald-300 leading-tight">
+                  {activeEm.optionB.gainText}
+                </span>
+                <span className="text-[11px] font-bold text-rose-300 leading-tight">
+                  {activeEm.optionB.sacrificeText}
                 </span>
               </button>
             </div>

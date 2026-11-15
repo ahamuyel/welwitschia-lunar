@@ -5,7 +5,8 @@ import type {
   TelemetryData,
   WellyMood,
   BaseInteriorState,
-  ChatMessage
+  ChatMessage,
+  NarrativeActNumber
 } from '../types/game';
 import { soundManager } from '../audio/SoundManager';
 
@@ -19,33 +20,51 @@ interface WellyCopilotProps {
   onCloseChat: () => void;
 }
 
+const NARRATIVE_ACT_INTROS: Record<NarrativeActNumber, { title: string; text: string; mood: WellyMood }> = {
+  1: {
+    title: 'ATO I: POUSO NA CRATERA SHACKLETON (0%–33%)',
+    text: 'Ato I — Pouso em Shackleton: Bem-vindo à Estação Welwitschia! Trouxemos a planta milenar do Deserto do Namibe, em Angola, para o Polo Sul da Lua. Prepara as 4 estações antes do pôr-do-sol lunar!',
+    mood: 'HAPPY'
+  },
+  2: {
+    title: 'ATO II: A LONGA NOITE DE -173°C (33%–75%)',
+    text: 'Ato II — A Longa Noite de -173°C: A sombra cobriu a cratera! A energia solar escasseia e cada decisão exige coragem e sacrifício do nosso Comandante Júnior!',
+    mood: 'ALERT'
+  },
+  3: {
+    title: 'ATO III: O AMANHECER DE ARTEMIS (75%–100%)',
+    text: 'Ato III — O Amanhecer de Artemis: Os primeiros raios de sol tocam os picos polares! Mantém a Welwitschia viva e transmite os dados de gelo lunar para Luanda!',
+    mood: 'HAPPY'
+  }
+};
+
 const WELLY_TOAST_MESSAGES: Record<string, { text: string; mood: WellyMood }> = {
   ON_START: {
-    text: 'Bem-vindo à Estação Welwitschia (Polo Sul Lunar, 2032)!',
+    text: 'Ato I: Bem-vindo à Estação Welwitschia (Polo Sul Lunar, 2032)!',
     mood: 'HAPPY'
   },
   ON_DOME_ENTER: {
-    text: 'Cabine pressurizada (101.3 kPa)! Olha 0.8s ou toca nas 4 estações 3D.',
+    text: 'Ato I — Shackleton: Trouxemos a força do Namibe para a Lua! Olha 0.8s ou toca nas estações.',
     mood: 'NEUTRAL'
   },
   ON_STORM_START: {
-    text: 'Alerta Solar! Usa o sonar e segue para o LRO-Scout.',
+    text: 'Ato II — Escuridão e Poeira Solar! Usa o sonar e os faróis rumo ao LRO-Scout!',
     mood: 'ALERT'
   },
   ON_HIGH_SPEED: {
-    text: 'Velocidade elevada na gravidade 1/6g! Cuidado com as rochas.',
+    text: 'Velocidade elevada na gravidade 1/6g! Cuidado com as rochas basálticas.',
     mood: 'ALERT'
   },
   ON_COLLISION: {
-    text: 'Impacto detetado no chassis! Desvia das rochas basálticas.',
+    text: 'Impacto detetado no chassis! Desvia das crateras e rochas.',
     mood: 'ALERT'
   },
   ON_ROVER_FOUND: {
-    text: 'Sonda LRO-Scout localizada! Extrai os dados de gelo polar.',
+    text: 'Ato III — Sonda LRO-Scout localizada! Extrai os dados para enviar a Luanda!',
     mood: 'HAPPY'
   },
   ON_ISRU_COMPLETE: {
-    text: 'Missão cumprida! Água e Oxigénio produzidos na refinaria ISRU.',
+    text: 'Ato III Concluído! Água, Oxigénio e dados transmitidos para Angola! Kandandu!',
     mood: 'HAPPY'
   }
 };
@@ -56,27 +75,49 @@ const QUICK_SUGGESTIONS: string[] = [
   'Como sobreviver à tempestade solar?'
 ];
 
+let speechDebounceTimer: number | null = null;
+
 /**
- * Síntese de voz 100% offline via Web Speech API (ativa apenas se o som não estiver em mute).
+ * Síntese de voz 100% offline via Web Speech API (pt-PT / pt-AO) com fila suave sem atropelar falas.
  */
-function speakWellyText(text: string): void {
+function speakWellyText(text: string, interrupt: boolean = false): void {
   if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
   if (soundManager.isAudioMuted()) return;
 
-  try {
-    window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = 'pt-PT';
-    utterance.rate = 1.04;
-    utterance.pitch = 1.08;
-    window.speechSynthesis.speak(utterance);
-  } catch {
-    // Ignora caso o navegador bloqueie síntese de voz automática
+  if (speechDebounceTimer) {
+    window.clearTimeout(speechDebounceTimer);
   }
+
+  speechDebounceTimer = window.setTimeout(() => {
+    try {
+      const synth = window.speechSynthesis;
+      if (synth.speaking && !interrupt) {
+        return;
+      }
+      if (interrupt) {
+        synth.cancel();
+      }
+      const utterance = new SpeechSynthesisUtterance(text);
+      const voices = synth.getVoices();
+      const ptVoice =
+        voices.find((v) => v.lang.toLowerCase().includes('pt-ao')) ||
+        voices.find((v) => v.lang.toLowerCase().includes('pt-pt')) ||
+        voices.find((v) => v.lang.toLowerCase().startsWith('pt'));
+      if (ptVoice) {
+        utterance.voice = ptVoice;
+      }
+      utterance.lang = 'pt-PT';
+      utterance.rate = 1.03;
+      utterance.pitch = 1.06;
+      synth.speak(utterance);
+    } catch {
+      // Ignora caso o navegador bloqueie síntese de voz automática
+    }
+  }, 160);
 }
 
 /**
- * Motor local 100% offline de respostas científicas da Copiloto IA Welly (Português de Angola).
+ * Motor local 100% offline de respostas científicas e narrativas da Copiloto IA Welly (Português de Angola).
  */
 function generateOfflineWellyAnswer(
   question: string,
@@ -85,35 +126,29 @@ function generateOfflineWellyAnswer(
   baseInterior?: BaseInteriorState
 ): string {
   const q = question.toLowerCase();
+  const actLabel = baseInterior?.narrativeActTitle ?? 'Ato I: Pouso na Cratera Shackleton';
 
   if (q.includes('-173') || q.includes('frio') || q.includes('noite') || q.includes('temperatura') || q.includes('calor')) {
-    return `Kandandu pela pergunta! Como a Lua quase não tem atmosfera (exosfera de 10⁻¹² torr), não há ar para guardar o calor. Ao sol faz +127°C e nas crateras escuras do Polo Sul chega a -173°C! Neste momento a nossa cabine está a ${baseInterior?.cabinTempC ?? 21}°C.`;
+    return `[${actLabel}] Kandandu pela pergunta! Como a Lua quase não tem atmosfera (exosfera de 10⁻¹² torr), não há ar para guardar o calor. Ao sol faz +127°C e nas crateras escuras do Polo Sul chega a -173°C! Neste momento a nossa cabine está a ${baseInterior?.cabinTempC ?? 21}°C.`;
   }
 
   if (q.includes('welwitschia') || q.includes('planta') || q.includes('estufa') || q.includes('namibe') || q.includes('angola')) {
-    return `A Welwitschia mirabilis é o símbolo do Deserto do Namibe, em Angola! Ela vive mais de 1.000 anos com pouquíssima água. Na nossa Estufa Lunar usamos hidroponia e luz magenta para ela produzir oxigénio e ajudar os astronautas!`;
+    return `[${actLabel}] A Welwitschia mirabilis é o tesouro do Deserto do Namibe, em Angola! Ela vive mais de 1.000 anos resistindo à seca extrema. Trouxemo-la para a Lua porque as suas folhas absorvem humidade e produzem oxigénio valioso para a tripulação!`;
   }
 
   if (q.includes('tempestade') || q.includes('solar') || q.includes('radia') || q.includes('escudo') || q.includes('kapton')) {
-    return `A Lua não tem campo magnético global como a Terra. Quando o Sol lança partículas (SPE), ativamos as bobinas revestidas a folha dourada Kapton (-25% Bateria) ou entramos em Modo Abrigo no núcleo para proteger a tripulação!`;
+    return `[${actLabel}] A Lua não tem campo magnético global como a Terra. Quando o Sol lança protões (SPE), temos 16 segundos para decidir: ativar o Escudo Kapton (-25% Bateria + penumbra na cabine) ou entrar em Modo Abrigo pausando a Estufa!`;
   }
 
   if (q.includes('poeira') || q.includes('regolito') || q.includes('painel') || q.includes('eletrost')) {
-    return `O regolito lunar é uma poeira fina de vidro vulcânico e rocha partida por meteoritos. Os raios UV do Sol deixam essa poeira com carga elétrica e ela cola-se aos painéis solares! Usamos o Pulso Eletrostático (EDS da NASA) para a repelir.`;
+    return `[${actLabel}] O regolito lunar é uma poeira cortante carregada eletricamente pelos raios UV do Sol. Podemos limpá-la com o Pulso Eletrostático EDS (-15% Bateria) ou saindo em EVA manual (poupa bateria, mas acelera o gasto de O₂ do fato)!`;
   }
 
-  if (q.includes('oxig') || q.includes('o2') || q.includes('água') || q.includes('gelo') || q.includes('isru') || q.includes('vácuo')) {
-    return `No Polo Sul Lunar extraímos gelo de água (H₂O) da cratera Shackleton. Com eletrólise (2H₂O → 2H₂ + O₂), fazemos oxigénio para respirar e combustível! Agora temos ${Math.round(resources.baseOxygen)}% de O₂ na base e ${Math.round(resources.suitOxygen)}% no fato.`;
+  if (q.includes('ato') || q.includes('história') || q.includes('missão') || q.includes('luanda') || q.includes('rover')) {
+    return `Estamos no ${actLabel} (${baseInterior?.missionProgressPct ?? 12}% da missão, a ${Math.round(telemetry.distanceToTargetM)}m do LRO-Scout). A nossa jornada tem 3 Atos: I. Pouso em Shackleton, II. A Longa Noite de -173°C e III. O Amanhecer de Artemis para transmitir os dados de gelo lunar até Luanda!`;
   }
 
-  if (q.includes('estado') || q.includes('bateria') || q.includes('energia') || q.includes('missão') || q.includes('rover')) {
-    const emText = baseInterior?.activeEmergency
-      ? `Atenção: há um alerta ativo (${baseInterior.activeEmergency.title})!`
-      : 'Todos os sistemas estão nominais!';
-    return `Relatório da Estação Welwitschia: Energia Solar a ${Math.round(resources.baseSolarEnergy)}%, Bateria do Rover a ${Math.round(resources.roverBattery)}%, O₂ a ${Math.round(resources.baseOxygen)}% e distância ao LRO-Scout de ${Math.round(telemetry.distanceToTargetM)}m. ${emText}`;
-  }
-
-  return `Aqui é a Welly, a tua Copiloto IA de Angola na missão Artemis! Estamos com ⚡ ${Math.round(resources.baseSolarEnergy)}% de energia e 💨 ${Math.round(resources.baseOxygen)}% de O₂. Podes perguntar-me sobre o frio de -173°C na Lua, a planta Welwitschia do Namibe, o gelo polar ISRU ou as tempestades solares!`;
+  return `[${actLabel}] Aqui é a Welly! Estamos com ⚡ ${Math.round(resources.baseSolarEnergy)}% de energia, 💨 ${Math.round(resources.baseOxygen)}% de O₂ e 🛠️ ${Math.round(baseInterior?.baseIntegrity ?? 100)}% de casco. Pergunta-me sobre o frio de -173°C, a Welwitschia de Angola ou como sobreviver às crises lunares!`;
 }
 
 export const WellyCopilot: React.FC<WellyCopilotProps> = ({
@@ -131,13 +166,14 @@ export const WellyCopilot: React.FC<WellyCopilotProps> = ({
     {
       id: 'welly-welcome',
       sender: 'WELLY',
-      text: 'Olá, Comandante! Sou a Welly, a tua IA cientista da Estação Welwitschia no Polo Sul Lunar. Toca numa pergunta rápida abaixo ou escreve a tua dúvida!',
+      text: NARRATIVE_ACT_INTROS[1].text,
       mood: 'HAPPY',
       timestamp: Date.now()
     }
   ]);
   const [inputValue, setInputValue] = useState<string>('');
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const lastAnnouncedActRef = useRef<NarrativeActNumber>(1);
 
   // Dispara toast de eventos do jogo e desmonta após 4.5 segundos
   useEffect(() => {
@@ -150,6 +186,8 @@ export const WellyCopilot: React.FC<WellyCopilotProps> = ({
 
     setToast(msg);
     setIsVisible(true);
+    speakWellyText(msg.text, false);
+
     if (msg.mood === 'ALERT') {
       soundManager.playAlertSiren();
     } else {
@@ -164,16 +202,46 @@ export const WellyCopilot: React.FC<WellyCopilotProps> = ({
     return () => window.clearTimeout(timer);
   }, [currentTrigger, gameState]);
 
-  // Dispara toast quando ocorre uma emergência autónoma da NASA (4.5s)
+  // Transição automática entre os 3 Atos Narrativos (Ato I -> Ato II -> Ato III)
+  useEffect(() => {
+    const currentAct = baseInterior?.narrativeAct ?? 1;
+    if (currentAct !== lastAnnouncedActRef.current) {
+      lastAnnouncedActRef.current = currentAct;
+      const actInfo = NARRATIVE_ACT_INTROS[currentAct];
+      setToast({ text: actInfo.text, mood: actInfo.mood });
+      setIsVisible(true);
+      setMessages((prev) => [
+        ...prev.slice(-8),
+        {
+          id: `act-${currentAct}-${Date.now()}`,
+          sender: 'WELLY',
+          text: actInfo.text,
+          mood: actInfo.mood,
+          timestamp: Date.now()
+        }
+      ]);
+      speakWellyText(actInfo.text, true);
+
+      const timer = window.setTimeout(() => {
+        setIsVisible(false);
+        setToast(null);
+      }, 5000);
+      return () => window.clearTimeout(timer);
+    }
+  }, [baseInterior?.narrativeAct]);
+
+  // Dispara aviso urgente quando ocorre uma emergência autónoma da NASA com timer de 16s
   useEffect(() => {
     const em = baseInterior?.activeEmergency;
     if (!em) return;
 
+    const alertLine = `⚠️ ${em.title} (16s para decidir!): ${em.description}`;
     setToast({
-      text: `${em.title}: ${em.description}`,
+      text: alertLine,
       mood: 'ALERT'
     });
     setIsVisible(true);
+    speakWellyText(`Alerta na estação! ${em.title}. Tens dezasseis segundos para decidir, Comandante!`, true);
 
     const timer = window.setTimeout(() => {
       setIsVisible(false);
@@ -183,21 +251,33 @@ export const WellyCopilot: React.FC<WellyCopilotProps> = ({
     return () => window.clearTimeout(timer);
   }, [baseInterior?.activeEmergency]);
 
-  // Dispara toast educativo após decisão tática e desmonta após 4.5 segundos
+  // Reage narrativamente às escolhas difíceis do jogador (reconhecendo o sacrifício feito ou a falha por indecisão)
   useEffect(() => {
     const fb = baseInterior?.lastConsequenceFeedback;
     if (!fb) return;
 
+    const narrativeLine = fb.wellyNarrativeQuote || `${fb.title}: ${fb.scientificReason}`;
     setToast({
-      text: `${fb.title}: ${fb.scientificReason}`,
+      text: narrativeLine,
       mood: fb.isPositive ? 'HAPPY' : 'ALERT'
     });
     setIsVisible(true);
+    setMessages((prev) => [
+      ...prev.slice(-8),
+      {
+        id: `conseq-${Date.now()}`,
+        sender: 'WELLY',
+        text: `${narrativeLine} (${fb.scientificReason})`,
+        mood: fb.isPositive ? 'HAPPY' : 'ALERT',
+        timestamp: Date.now()
+      }
+    ]);
+    speakWellyText(narrativeLine, true);
 
     const timer = window.setTimeout(() => {
       setIsVisible(false);
       setToast(null);
-    }, 4500);
+    }, 5000);
 
     return () => window.clearTimeout(timer);
   }, [baseInterior?.lastConsequenceFeedback]);
@@ -232,7 +312,7 @@ export const WellyCopilot: React.FC<WellyCopilotProps> = ({
 
     setMessages((prev) => [...prev.slice(-8), userMsg, wellyMsg]);
     setInputValue('');
-    speakWellyText(replyText);
+    speakWellyText(replyText, true);
   };
 
   if (gameState === 'STATE_PROLOGUE' || gameState === 'STATE_RESCUE_AND_ISRU') {
@@ -251,18 +331,18 @@ export const WellyCopilot: React.FC<WellyCopilotProps> = ({
             className="pointer-events-auto w-full max-w-md sm:w-96 max-h-[38dvh] flex flex-col rounded-2xl bg-slate-950/90 backdrop-blur-xl border border-cyan-400/45 shadow-2xl overflow-hidden text-xs text-slate-100"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Cabeçalho do Chat Welly */}
+            {/* Cabeçalho do Chat Welly com Indicador do Ato Narrativo */}
             <div className="flex items-center justify-between px-3 py-1.5 bg-slate-900/90 border-b border-white/10 shrink-0">
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-1.5 truncate">
                 <span className="text-sm">🤖</span>
-                <span className="font-bold text-cyan-300 tracking-wide">
-                  COPILOTO IA WELLY (OFFLINE NASA)
+                <span className="font-bold text-cyan-300 tracking-wide truncate">
+                  WELLY • {baseInterior?.narrativeActTitle ?? 'Ato I: Shackleton'}
                 </span>
               </div>
               <button
                 type="button"
                 onClick={onCloseChat}
-                className="min-h-[32px] min-w-[32px] rounded-lg bg-slate-800/90 text-slate-300 hover:text-white flex items-center justify-center font-bold cursor-pointer"
+                className="min-h-[32px] min-w-[32px] rounded-lg bg-slate-800/90 text-slate-300 hover:text-white flex items-center justify-center font-bold cursor-pointer shrink-0"
                 title="Fechar Chat Welly"
               >
                 ✕
@@ -312,7 +392,7 @@ export const WellyCopilot: React.FC<WellyCopilotProps> = ({
                 type="text"
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
-                placeholder="Pergunta à Welly sobre a Lua ou a base..."
+                placeholder="Pergunta à Welly sobre a Lua ou a missão..."
                 className="flex-1 min-w-0 px-2.5 py-1 rounded-xl bg-slate-900 border border-white/15 text-xs text-white placeholder-slate-400 focus:outline-none focus:border-cyan-400 select-text"
               />
               <button
@@ -326,7 +406,7 @@ export const WellyCopilot: React.FC<WellyCopilotProps> = ({
         </div>
       )}
 
-      {/* 2. NOTIFICAÇÃO CURTA AUTO-DESCARTÁVEL (4.5s) QUANDO O CHAT ESTÁ FECHADO */}
+      {/* 2. NOTIFICAÇÃO NARRATIVA AUTO-DESCARTÁVEL (4.5s–5s) QUANDO O CHAT ESTÁ FECHADO */}
       {!isChatOpen &&
         isVisible &&
         toast &&
@@ -337,18 +417,18 @@ export const WellyCopilot: React.FC<WellyCopilotProps> = ({
             style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
           >
             <div
-              className={`max-w-[92vw] sm:max-w-lg px-3.5 py-1.5 rounded-full backdrop-blur-md border shadow-lg flex items-center gap-2 text-xs font-medium pointer-events-none ${
+              className={`max-w-[94vw] sm:max-w-xl px-3.5 py-2 rounded-2xl backdrop-blur-md border shadow-lg flex items-center gap-2 text-xs font-medium pointer-events-none ${
                 toast.mood === 'ALERT'
-                  ? 'bg-red-950/85 border-red-400/50 text-red-100'
+                  ? 'bg-red-950/90 border-red-400/60 text-red-100'
                   : toast.mood === 'HAPPY'
-                  ? 'bg-emerald-950/85 border-emerald-400/50 text-emerald-100'
-                  : 'bg-slate-950/80 border-white/15 text-slate-100'
+                  ? 'bg-emerald-950/90 border-emerald-400/55 text-emerald-100'
+                  : 'bg-slate-950/85 border-white/15 text-slate-100'
               }`}
             >
               <span className="shrink-0">
                 {toast.mood === 'ALERT' ? '⚠️' : toast.mood === 'HAPPY' ? '🌱' : '🛰️'}
               </span>
-              <span className="truncate">{toast.text}</span>
+              <span className="line-clamp-2 leading-snug">{toast.text}</span>
             </div>
           </div>
         )}

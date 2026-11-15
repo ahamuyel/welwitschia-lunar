@@ -79,6 +79,7 @@ export class WelwitschiaStation {
   private targetLedColor: THREE.Color = new THREE.Color(0x00f0ff);
   private floorGuideMat!: THREE.MeshStandardMaterial;
   private cabinAirParticles!: THREE.Points;
+  private hullSparksParticles!: THREE.Points;
 
   private lastInteriorState: BaseInteriorState | null = null;
   private lastResourcesState: ResourceState | null = null;
@@ -558,6 +559,34 @@ export class WelwitschiaStation {
 
     this.cabinAirParticles = new THREE.Points(geo, mat);
     this.group.add(this.cabinAirParticles);
+
+    // Partículas de faíscas e fumo para sacrifício de integridade / sobrecarga (HULL_SPARKS_SHAKE)
+    const sparkCount = 48;
+    const sparkPos = new Float32Array(sparkCount * 3);
+    const sparkColors = new Float32Array(sparkCount * 3);
+    for (let s = 0; s < sparkCount; s++) {
+      sparkPos[s * 3] = (Math.random() - 0.5) * 2.4;
+      sparkPos[s * 3 + 1] = 2.0 + Math.random() * 1.8;
+      sparkPos[s * 3 + 2] = -3.8 + (Math.random() - 0.5) * 1.6;
+      // Laranja/amarelo incandescente
+      sparkColors[s * 3] = 1.0;
+      sparkColors[s * 3 + 1] = 0.45 + Math.random() * 0.5;
+      sparkColors[s * 3 + 2] = 0.1;
+    }
+    const sparkGeo = new THREE.BufferGeometry();
+    sparkGeo.setAttribute('position', new THREE.BufferAttribute(sparkPos, 3));
+    sparkGeo.setAttribute('color', new THREE.BufferAttribute(sparkColors, 3));
+    const sparkMat = new THREE.PointsMaterial({
+      size: 0.14,
+      vertexColors: true,
+      transparent: true,
+      opacity: 0.9,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false
+    });
+    this.hullSparksParticles = new THREE.Points(sparkGeo, sparkMat);
+    this.hullSparksParticles.visible = false;
+    this.group.add(this.hullSparksParticles);
   }
 
   /**
@@ -1726,10 +1755,36 @@ export class WelwitschiaStation {
       }
 
       const lerpAlpha = Math.min(1.0, delta * 4.5);
+      const isPowerDimming = interior?.activeSideEffect === 'POWER_DIMMING';
+      const dimMultiplier = isPowerDimming ? 0.35 : 1.0;
       this.floorLedMat.color.lerp(this.targetLedColor, lerpAlpha);
       this.ceilingLedMat.color.lerp(this.targetLedColor, lerpAlpha);
       this.perimeterPointLight.color.lerp(this.targetLedColor, lerpAlpha);
-      this.perimeterPointLight.intensity += (targetIntensity - this.perimeterPointLight.intensity) * lerpAlpha;
+      this.perimeterPointLight.intensity +=
+        (targetIntensity * dimMultiplier - this.perimeterPointLight.intensity) * lerpAlpha;
+      if (this.interiorLight) {
+        const targetCabinLight = isPowerDimming ? 2.2 * 0.35 : 2.2;
+        this.interiorLight.intensity += (targetCabinLight - this.interiorLight.intensity) * lerpAlpha;
+      }
+    }
+
+    // 1a. Faíscas e fumo quando há sacrifício de integridade (HULL_SPARKS_SHAKE) ou Falha por Indecisão
+    if (this.hullSparksParticles) {
+      const showSparks =
+        interior?.activeSideEffect === 'HULL_SPARKS_SHAKE' ||
+        interior?.activeSideEffect === 'INDECISION_ALARM';
+      this.hullSparksParticles.visible = showSparks;
+      if (showSparks) {
+        const sPos = this.hullSparksParticles.geometry.getAttribute('position') as THREE.BufferAttribute;
+        for (let i = 0; i < sPos.count; i++) {
+          let sy = sPos.getY(i) - delta * (2.4 + (i % 5) * 0.45);
+          if (sy < 1.35) {
+            sy = 2.6 + Math.random() * 1.3;
+          }
+          sPos.setY(i, sy);
+        }
+        sPos.needsUpdate = true;
+      }
     }
 
     // 1b. Atualiza as 3 Barras Luminosas 3D integradas em cada uma das 4 máquinas
@@ -1771,8 +1826,9 @@ export class WelwitschiaStation {
       }
     }
 
-    // 4. Plantas Welwitschia mirabilis em 3D (verdes/firmes quando saudáveis, inclinadas/amareladas no frio ou baixa energia)
-    const healthy = interior ? interior.greenhouseHealthy && !interior.labPaused : true;
+    // 4. Plantas Welwitschia mirabilis em 3D (verdes/firmes quando saudáveis, inclinadas/sem brilho quando murchas)
+    const isWilting = interior?.activeSideEffect === 'GREENHOUSE_WILT';
+    const healthy = interior ? interior.greenhouseHealthy && !interior.labPaused && !isWilting : true;
     this.welwitschiaPlants.forEach((plant, idx) => {
       if (healthy) {
         plant.mat.color.setHex(0x22c55e);
@@ -1782,12 +1838,12 @@ export class WelwitschiaStation {
         plant.leafLeft.rotation.z = 0.18 + breeze;
         plant.leafRight.rotation.z = -0.18 - breeze;
       } else {
-        // Inclinadas e amareladas por frio ou falta de energia
-        plant.mat.color.setHex(0xeab308);
-        plant.mat.emissive.setHex(0x854d0e);
-        plant.mat.emissiveIntensity = 0.35;
-        plant.leafLeft.rotation.z = -0.28;
-        plant.leafRight.rotation.z = 0.28;
+        // Inclinadas e perdendo o brilho verde até recuperarem
+        plant.mat.color.setHex(0xa16207);
+        plant.mat.emissive.setHex(0x422006);
+        plant.mat.emissiveIntensity = 0.08;
+        plant.leafLeft.rotation.z = -0.36;
+        plant.leafRight.rotation.z = 0.36;
       }
     });
 
@@ -2059,11 +2115,12 @@ export class WelwitschiaStation {
 
         const shortA = activeEm.optionA.label.replace(/^\[A\]\s*/, '');
         const shortB = activeEm.optionB.label.replace(/^\[B\]\s*/, '');
+        const secLeft = Math.ceil(interior?.decisionTimeRemaining ?? 16);
 
         this.drawTerminalCanvas(
           this.decisionCanvasA.canvas,
-          `OPÇÃO A • ${activeEm.title.toUpperCase()}`,
-          `🛡️ ${shortA.slice(0, 34)}`,
+          `⏱️ ${secLeft}s • OPÇÃO A`,
+          activeEm.optionA.sacrificeText.slice(0, 34),
           shortA.slice(0, 26),
           false,
           '#00f0ff'
@@ -2072,8 +2129,8 @@ export class WelwitschiaStation {
 
         this.drawTerminalCanvas(
           this.decisionCanvasB.canvas,
-          `OPÇÃO B • ${activeEm.title.toUpperCase()}`,
-          `⚡ ${shortB.slice(0, 34)}`,
+          `⏱️ ${secLeft}s • OPÇÃO B`,
+          activeEm.optionB.sacrificeText.slice(0, 34),
           shortB.slice(0, 26),
           false,
           '#ffb84d'

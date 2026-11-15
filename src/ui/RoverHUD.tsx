@@ -95,7 +95,7 @@ export const RoverHUD: React.FC<RoverHUDProps> = ({
         className="w-full flex items-center justify-between pointer-events-none"
         style={{ height: '44px', padding: '0 12px' }}
       >
-        {/* À ESQUERDA: Pílula com 3 ícones essenciais */}
+        {/* À ESQUERDA: Pílula com 3 ícones essenciais + Indicador discreto do Ato Narrativo */}
         <div className="pointer-events-none inline-flex items-center gap-2 px-3 min-h-[38px] rounded-full bg-slate-950/70 backdrop-blur-md border border-white/15 shadow-md text-xs font-semibold text-slate-100 whitespace-nowrap">
           <span className={resources.roverBattery < 25 ? 'text-red-400' : 'text-amber-300'}>
             ⚡ {Math.round(resources.roverBattery)}%
@@ -107,6 +107,19 @@ export const RoverHUD: React.FC<RoverHUDProps> = ({
           <span className="text-white/25">|</span>
           <span className="text-emerald-300">
             📍 {Math.round(telemetry.distanceToTargetM)}m
+          </span>
+          <span className="text-white/25">|</span>
+          <span className="text-[11px] font-bold text-cyan-300">
+            <span className="sm:hidden">
+              {telemetry.distanceToTargetM > 430 ? 'Ato I' : telemetry.distanceToTargetM > 160 ? 'Ato II' : 'Ato III'}
+            </span>
+            <span className="hidden sm:inline">
+              {telemetry.distanceToTargetM > 430
+                ? 'Ato I: Shackleton'
+                : telemetry.distanceToTargetM > 160
+                ? 'Ato II: Noite Lunar'
+                : 'Ato III: Amanhecer'}
+            </span>
           </span>
         </div>
 

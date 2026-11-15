@@ -474,6 +474,71 @@ class SoundManager {
     this.playUiBeep(freq, 0.16);
   }
 
+  /**
+   * Pulso sonoro de telemetria de urgência nos últimos 5 segundos do timer de decisão.
+   */
+  public playUrgencyTelemetryPulse(secondsLeft: number): void {
+    if (!this.ensureContext() || !this.ctx || this.isMuted) return;
+    try {
+      const t = this.ctx.currentTime;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+
+      // Aumenta o pitch conforme o tempo se aproxima de 0 (5s -> 1s)
+      const urgencyFactor = Math.max(0, 6 - secondsLeft);
+      const freq = 720 + urgencyFactor * 140;
+
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(freq, t);
+      osc.frequency.exponentialRampToValueAtTime(freq * 1.18, t + 0.09);
+
+      gain.gain.setValueAtTime(0.16, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+      osc.start(t);
+      osc.stop(t + 0.13);
+    } catch {
+      // Ignora erro
+    }
+  }
+
+  /**
+   * Alarme severo de Falha por Indecisão quando o timer chega a 0s.
+   */
+  public playIndecisionFailureAlarm(): void {
+    if (!this.ensureContext() || !this.ctx || this.isMuted) return;
+    try {
+      const t = this.ctx.currentTime;
+      const osc1 = this.ctx.createOscillator();
+      const osc2 = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+
+      osc1.type = 'sawtooth';
+      osc1.frequency.setValueAtTime(290, t);
+      osc1.frequency.setValueAtTime(195, t + 0.22);
+      osc1.frequency.setValueAtTime(290, t + 0.44);
+
+      osc2.type = 'square';
+      osc2.frequency.setValueAtTime(145, t);
+
+      gain.gain.setValueAtTime(0.22, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.75);
+
+      osc1.connect(gain);
+      osc2.connect(gain);
+      gain.connect(this.ctx.destination);
+
+      osc1.start(t);
+      osc2.start(t);
+      osc1.stop(t + 0.76);
+      osc2.stop(t + 0.76);
+    } catch {
+      // Ignora erro
+    }
+  }
+
   public isAudioMuted(): boolean {
     return this.isMuted;
   }
