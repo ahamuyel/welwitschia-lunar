@@ -212,8 +212,13 @@ export function App() {
         {isMuted ? '🔇' : '🔊'}
       </button>
 
-      {/* 3. Copiloto IA Welly (Fila Sequencial de Mensagens e FAQ Científica) */}
-      <WellyCopilot currentTrigger={wellyTrigger} />
+      {/* 3. Copiloto IA Welly (Fila Sequencial, Chat Conversacional Híbrido e Voz) */}
+      <WellyCopilot
+        currentTrigger={wellyTrigger}
+        telemetry={telemetry}
+        resources={resources}
+        gameState={gameState}
+      />
 
       {/* 4. Telas dos 5 Estados de Jogo */}
       {gameState === 'STATE_PROLOGUE' && (

@@ -21,7 +21,7 @@ export function createEarthDayTexture(): THREE.CanvasTexture {
   ctx.fillStyle = oceanGrad;
   ctx.fillRect(0, 0, 1024, 512);
 
-  // Áreas costeiras mais rasas (turquesa sutil)
+  // Áreas costeiras mais rasas
   ctx.fillStyle = 'rgba(32, 178, 170, 0.25)';
   const drawShallows = (cx: number, cy: number, w: number, h: number) => {
     ctx.beginPath();
@@ -34,7 +34,7 @@ export function createEarthDayTexture(): THREE.CanvasTexture {
   drawShallows(330, 350, 80, 120);
 
   // 2. Continentes procedurais estilizados
-  ctx.fillStyle = '#2e5a27'; // Verde floresta / estepe
+  ctx.fillStyle = '#2e5a27';
   const drawContinent = (cx: number, cy: number, w: number, h: number, seed: number) => {
     ctx.beginPath();
     for (let a = 0; a < Math.PI * 2; a += 0.12) {
@@ -50,32 +50,27 @@ export function createEarthDayTexture(): THREE.CanvasTexture {
     ctx.fill();
   };
 
-  // África e Península Arábica
   drawContinent(520, 260, 180, 230, 1.2);
-  // Áreas desérticas do Saara e Namibe em ocre dourado
   ctx.fillStyle = '#bfa15f';
   drawContinent(515, 210, 130, 80, 2.1);
   drawContinent(535, 330, 55, 60, 1.8);
 
-  // Continente Asiático / Eurásia
   ctx.fillStyle = '#355e3b';
   drawContinent(720, 180, 260, 200, 2.7);
 
-  // Américas (Norte e Sul)
   ctx.fillStyle = '#2c532d';
   drawContinent(260, 190, 170, 160, 3.5);
   drawContinent(330, 350, 130, 210, 4.1);
 
-  // Austrália
   ctx.fillStyle = '#a0522d';
   drawContinent(840, 370, 100, 75, 5.3);
 
-  // 3. Calotas Polares (Ártico e Antártica)
+  // 3. Calotas Polares
   ctx.fillStyle = '#f8fafc';
   ctx.fillRect(0, 0, 1024, 38);
   ctx.fillRect(0, 474, 1024, 38);
 
-  // 4. Turbilhões e faixas de nuvens atmosféricas brancas
+  // 4. Turbilhões e faixas de nuvens
   ctx.fillStyle = 'rgba(255, 255, 255, 0.55)';
   for (let y = 50; y < 460; y += 40) {
     ctx.beginPath();
@@ -96,18 +91,16 @@ export function createEarthDayTexture(): THREE.CanvasTexture {
   return texture;
 }
 
-/** Gera textura do lado noturno da Terra (com luzes pontuais de cidades) */
+/** Gera textura do lado noturno da Terra */
 export function createEarthNightTexture(): THREE.CanvasTexture {
   const canvas = document.createElement('canvas');
   canvas.width = 1024;
   canvas.height = 512;
   const ctx = canvas.getContext('2d')!;
 
-  // Escuridão total dos oceanos
   ctx.fillStyle = '#020408';
   ctx.fillRect(0, 0, 1024, 512);
 
-  // Luzes das cidades (clusters de luz dourada/âmbar suave)
   const drawCityLights = (cx: number, cy: number, count: number, radius: number) => {
     for (let i = 0; i < count; i++) {
       const angle = Math.random() * Math.PI * 2;
@@ -121,12 +114,11 @@ export function createEarthNightTexture(): THREE.CanvasTexture {
     }
   };
 
-  // Luzes da Europa, América do Norte e Ásia Oriental
-  drawCityLights(500, 170, 200, 50); // Europa
-  drawCityLights(270, 180, 250, 60); // Costa Leste EUA
-  drawCityLights(780, 210, 280, 70); // Ásia Oriental / Japão
-  drawCityLights(530, 360, 80, 30);  // África do Sul / Namíbia
-  drawCityLights(340, 370, 90, 35);  // Costa Sudeste Brasil
+  drawCityLights(500, 170, 200, 50);
+  drawCityLights(270, 180, 250, 60);
+  drawCityLights(780, 210, 280, 70);
+  drawCityLights(530, 360, 80, 30);
+  drawCityLights(340, 370, 90, 35);
 
   const texture = new THREE.CanvasTexture(canvas);
   texture.wrapS = THREE.RepeatWrapping;
@@ -141,14 +133,12 @@ export function createHighResRegolithBumpMap(): THREE.CanvasTexture {
   canvas.height = 1024;
   const ctx = canvas.getContext('2d')!;
 
-  // Base cinza 128 (neutro para bump mapping)
   ctx.fillStyle = '#808080';
   ctx.fillRect(0, 0, 1024, 1024);
 
   const imgData = ctx.getImageData(0, 0, 1024, 1024);
   const data = imgData.data;
 
-  // Ruído per-pixel de alta frequência para regolito pulverizado
   for (let i = 0; i < data.length; i += 4) {
     const grain = (Math.random() - 0.5) * 55;
     const val = Math.min(255, Math.max(0, 128 + grain));
@@ -158,7 +148,6 @@ export function createHighResRegolithBumpMap(): THREE.CanvasTexture {
   }
   ctx.putImageData(imgData, 0, 0);
 
-  // Micro-crateras de impacto aleatórias com sombras e bordas iluminadas
   for (let c = 0; c < 450; c++) {
     const cx = Math.random() * 1024;
     const cy = Math.random() * 1024;
@@ -174,7 +163,6 @@ export function createHighResRegolithBumpMap(): THREE.CanvasTexture {
     ctx.fill();
   }
 
-  // Marcas sutis de pedriscos e micro-ejetos lineares
   ctx.strokeStyle = '#404040';
   ctx.lineWidth = 1;
   for (let l = 0; l < 80; l++) {
@@ -195,18 +183,130 @@ export function createHighResRegolithBumpMap(): THREE.CanvasTexture {
   return texture;
 }
 
-/** Gera textura para os painéis solares verticais (com ou sem poeira eletrostática) */
+/** Gera Normal Map procedural de alta resolução (1024x1024) para micro-sombras sob luz a 5° */
+export function createHighResRegolithNormalMap(): THREE.CanvasTexture {
+  const canvas = document.createElement('canvas');
+  canvas.width = 1024;
+  canvas.height = 1024;
+  const ctx = canvas.getContext('2d')!;
+
+  // Normal padrão voltada para Z (0.5, 0.5, 1.0) -> RGB(128, 128, 255)
+  ctx.fillStyle = '#8080ff';
+  ctx.fillRect(0, 0, 1024, 1024);
+
+  const imgData = ctx.getImageData(0, 0, 1024, 1024);
+  const data = imgData.data;
+
+  for (let i = 0; i < data.length; i += 4) {
+    const nx = (Math.random() - 0.5) * 35;
+    const ny = (Math.random() - 0.5) * 35;
+    data[i] = Math.min(255, Math.max(0, 128 + nx));
+    data[i + 1] = Math.min(255, Math.max(0, 128 + ny));
+    data[i + 2] = 255;
+    data[i + 3] = 255;
+  }
+  ctx.putImageData(imgData, 0, 0);
+
+  // Micro-crateras com relevo normal vetorial
+  for (let c = 0; c < 280; c++) {
+    const cx = Math.random() * 1024;
+    const cy = Math.random() * 1024;
+    const cr = 3 + Math.random() * 12;
+
+    const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, cr);
+    grad.addColorStop(0, '#5050ff');
+    grad.addColorStop(0.5, '#7070ff');
+    grad.addColorStop(0.9, '#a090ff');
+    grad.addColorStop(1, '#8080ff');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(cx, cy, cr, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.RepeatWrapping;
+  texture.repeat.set(100, 100);
+  return texture;
+}
+
+/** Gera Roughness Map procedural para variação de rugosidade no regolito e rochas */
+export function createHighResRegolithRoughnessMap(): THREE.CanvasTexture {
+  const canvas = document.createElement('canvas');
+  canvas.width = 512;
+  canvas.height = 512;
+  const ctx = canvas.getContext('2d')!;
+
+  ctx.fillStyle = '#e5e5e5'; // Alta rugosidade geral (~0.9)
+  ctx.fillRect(0, 0, 512, 512);
+
+  const imgData = ctx.getImageData(0, 0, 512, 512);
+  const data = imgData.data;
+
+  for (let i = 0; i < data.length; i += 4) {
+    const v = 220 + (Math.random() - 0.5) * 45;
+    data[i] = v;
+    data[i + 1] = v;
+    data[i + 2] = v;
+    data[i + 3] = 255;
+  }
+  ctx.putImageData(imgData, 0, 0);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.RepeatWrapping;
+  texture.repeat.set(80, 80);
+  return texture;
+}
+
+/** Gera textura de depósito de gelo lunar cristalino nas crateras permanentemente sombreadas */
+export function createIceDepositTexture(): THREE.CanvasTexture {
+  const canvas = document.createElement('canvas');
+  canvas.width = 512;
+  canvas.height = 512;
+  const ctx = canvas.getContext('2d')!;
+
+  const grad = ctx.createLinearGradient(0, 0, 512, 512);
+  grad.addColorStop(0, '#b8dcfe');
+  grad.addColorStop(0.5, '#90c5fe');
+  grad.addColorStop(1, '#60a5fa');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, 512, 512);
+
+  // Fraturas de gelo cristalino
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
+  ctx.lineWidth = 1.5;
+  for (let i = 0; i < 40; i++) {
+    ctx.beginPath();
+    let x = Math.random() * 512;
+    let y = Math.random() * 512;
+    ctx.moveTo(x, y);
+    for (let s = 0; s < 4; s++) {
+      x += (Math.random() - 0.5) * 80;
+      y += (Math.random() - 0.5) * 80;
+      ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.RepeatWrapping;
+  texture.repeat.set(8, 8);
+  return texture;
+}
+
+/** Gera textura para os painéis solares verticais */
 export function createSolarPanelTexture(dusty: boolean = false): THREE.CanvasTexture {
   const canvas = document.createElement('canvas');
   canvas.width = 256;
   canvas.height = 512;
   const ctx = canvas.getContext('2d')!;
 
-  // Células fotovoltaicas de silício azul escuro
   ctx.fillStyle = dusty ? '#2e3845' : '#0a1d37';
   ctx.fillRect(0, 0, 256, 512);
 
-  // Grade condutora dourada/prateada
   ctx.strokeStyle = dusty ? '#5a626a' : '#d4af37';
   ctx.lineWidth = 2;
 
@@ -229,7 +329,6 @@ export function createSolarPanelTexture(dusty: boolean = false): THREE.CanvasTex
     ctx.stroke();
   }
 
-  // Poeira de regolito
   if (dusty) {
     ctx.fillStyle = 'rgba(120, 125, 130, 0.65)';
     ctx.fillRect(0, 0, 256, 512);
@@ -249,4 +348,44 @@ export function createSolarPanelTexture(dusty: boolean = false): THREE.CanvasTex
   }
 
   return new THREE.CanvasTexture(canvas);
+}
+
+/** Gera o emblema iluminado estilizado da planta Welwitschia para a entrada da base */
+export function createWelwitschiaEmblemTexture(): THREE.CanvasTexture {
+  const canvas = document.createElement('canvas');
+  canvas.width = 512;
+  canvas.height = 256;
+  const ctx = canvas.getContext('2d')!;
+
+  ctx.fillStyle = '#0f172a';
+  ctx.fillRect(0, 0, 512, 256);
+
+  ctx.strokeStyle = '#00f0ff';
+  ctx.lineWidth = 4;
+  ctx.strokeRect(10, 10, 492, 236);
+
+  // Silhueta estilizada das duas folhas perenes da Welwitschia
+  ctx.fillStyle = '#10b981';
+  ctx.beginPath();
+  // Folha esquerda ondulada
+  ctx.moveTo(256, 170);
+  ctx.bezierCurveTo(200, 140, 120, 160, 80, 120);
+  ctx.bezierCurveTo(110, 100, 180, 110, 240, 150);
+  // Folha direita ondulada
+  ctx.moveTo(256, 170);
+  ctx.bezierCurveTo(312, 140, 392, 160, 432, 120);
+  ctx.bezierCurveTo(402, 100, 332, 110, 272, 150);
+  ctx.fill();
+
+  ctx.font = 'bold 22px monospace';
+  ctx.fillStyle = '#38bdf8';
+  ctx.textAlign = 'center';
+  ctx.fillText('ESTAÇÃO WELWITSCHIA 2032', 256, 60);
+
+  ctx.font = '14px monospace';
+  ctx.fillStyle = '#f59e0b';
+  ctx.fillText('CRATERA SHACKLETON • POLO SUL', 256, 215);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  return texture;
 }

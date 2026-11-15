@@ -5,8 +5,9 @@
  * e marcador do LRO-Scout (com estática na tempestade).
  */
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import type { TelemetryData, ResourceState } from '../types/game';
+import { wellyVoice } from '../audio/WellyVoice';
 
 interface RoverHUDProps {
   telemetry: TelemetryData;
@@ -14,6 +15,8 @@ interface RoverHUDProps {
   onToggleHeadlights: () => void;
   onToggleCamera: () => void;
   onExtractData?: () => void;
+  onToggleVoice?: () => void;
+  isVoiceMuted?: boolean;
 }
 
 export const RoverHUD: React.FC<RoverHUDProps> = ({
@@ -21,8 +24,28 @@ export const RoverHUD: React.FC<RoverHUDProps> = ({
   resources,
   onToggleHeadlights,
   onToggleCamera,
-  onExtractData
+  onExtractData,
+  onToggleVoice,
+  isVoiceMuted: propIsVoiceMuted
 }) => {
+  const [internalVoiceMuted, setInternalVoiceMuted] = useState<boolean>(wellyVoice.getIsMuted());
+
+  useEffect(() => {
+    if (propIsVoiceMuted !== undefined) {
+      setInternalVoiceMuted(propIsVoiceMuted);
+    }
+  }, [propIsVoiceMuted]);
+
+  const handleToggleVoice = () => {
+    if (onToggleVoice) {
+      onToggleVoice();
+    } else {
+      const muted = wellyVoice.toggleMute();
+      setInternalVoiceMuted(muted);
+    }
+  };
+
+  const isMuted = propIsVoiceMuted !== undefined ? propIsVoiceMuted : internalVoiceMuted;
   const isHighSpeed = telemetry.speedKmh > 20;
   const isSafeSpeed = telemetry.speedKmh <= 15;
 
@@ -164,22 +187,33 @@ export const RoverHUD: React.FC<RoverHUDProps> = ({
             </div>
           )}
 
-          <div className="flex gap-2 pt-1 border-t border-slate-800">
+          <div className="grid grid-cols-3 gap-1.5 pt-1 border-t border-slate-800">
             <button
               onClick={onToggleHeadlights}
-              className={`flex-1 py-1 px-2 rounded text-[11px] font-mono font-bold border transition-colors cursor-pointer ${
+              className={`py-1 px-1.5 rounded text-[10px] font-mono font-bold border transition-colors cursor-pointer text-center ${
                 telemetry.isHeadlightsOn
                   ? 'border-amber-400 bg-amber-950/40 text-amber-300'
                   : 'border-slate-800 bg-slate-900 text-slate-400'
               }`}
             >
-              [L] FARÓIS: {telemetry.isHeadlightsOn ? 'ON' : 'OFF'}
+              [L] FARÓIS
             </button>
             <button
               onClick={onToggleCamera}
-              className="flex-1 py-1 px-2 rounded text-[11px] font-mono font-bold border border-slate-800 bg-slate-900 text-cyan-300 hover:border-cyan-400 transition-colors cursor-pointer"
+              className="py-1 px-1.5 rounded text-[10px] font-mono font-bold border border-slate-800 bg-slate-900 text-cyan-300 hover:border-cyan-400 transition-colors cursor-pointer text-center"
             >
-              [C] {telemetry.cameraMode === 'THIRD_PERSON' ? '3ª PESSOA' : 'COCKPIT'}
+              [C] {telemetry.cameraMode === 'THIRD_PERSON' ? '3ª PES' : 'COCKPIT'}
+            </button>
+            <button
+              onClick={handleToggleVoice}
+              className={`py-1 px-1.5 rounded text-[10px] font-mono font-bold border transition-colors cursor-pointer text-center ${
+                !isMuted
+                  ? 'border-emerald-400 bg-emerald-950/40 text-emerald-300'
+                  : 'border-slate-800 bg-slate-900 text-slate-400'
+              }`}
+              title={!isMuted ? 'Silenciar voz da Welly' : 'Ativar voz da Welly'}
+            >
+              {!isMuted ? '🔊 VOZ ON' : '🔇 MUDO'}
             </button>
           </div>
         </div>

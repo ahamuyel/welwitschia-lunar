@@ -55,6 +55,14 @@ export interface WellyQueueItem {
   priority?: 'NORMAL' | 'URGENT';
 }
 
+export interface ChatMessage {
+  id: string;
+  sender: 'PLAYER' | 'WELLY';
+  text: string;
+  mood?: WellyMood;
+  timestamp: number;
+}
+
 export interface FAQItem {
   id: string;
   question: string;

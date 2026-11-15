@@ -1,7 +1,8 @@
 /**
  * Welwitschia Lunar - Rover Perdido (LRO-Scout)
  * Posicionado inclinado a 18° na borda de uma cratera de impacto a 2.000m da base (azimute 045° NE).
- * Painéis solares cobertos por poeira cinza e LED de emergência âmbar piscando lentamente.
+ * Carenagem em folha dourada MLI degradada, painéis solares cobertos por regolito espesso,
+ * braço robótico de coleta de gelo desativado e LED de emergência âmbar pulsante.
  */
 
 import * as THREE from 'three';
@@ -13,24 +14,24 @@ export class LostRover {
   public beaconLed: THREE.Mesh;
   public interactionBeacon: THREE.Mesh;
   public targetPosition: THREE.Vector3;
+  public roboticArm: THREE.Group;
 
   constructor(x: number, y: number, z: number) {
     this.group = new THREE.Group();
     this.targetPosition = new THREE.Vector3(x, y, z);
     this.group.position.set(x, y, z);
 
-    // Inclinação geológica de 18° na borda da cratera conforme diretriz do GDD
-    // 18 graus = 18 * Math.PI / 180 = ~0.314 rad
+    // Inclinação geológica de 18° na borda da cratera
     this.group.rotation.x = 0.28;
     this.group.rotation.z = -0.15;
     this.group.rotation.y = 0.8;
 
-    // 1. Corpo principal do Scout robótico
+    // 1. Chassi principal com acabamento em folha dourada MLI
     const bodyGeo = new THREE.BoxGeometry(1.6, 0.7, 2.2);
     const bodyMat = new THREE.MeshStandardMaterial({
-      color: 0x9ca3af,
-      metalness: 0.6,
-      roughness: 0.7
+      color: 0xc8963e, // Dourado MLI com poeira acumulada
+      metalness: 0.82,
+      roughness: 0.55
     });
     const body = new THREE.Mesh(bodyGeo, bodyMat);
     body.position.y = 0.6;
@@ -38,22 +39,22 @@ export class LostRover {
     body.receiveShadow = true;
     this.group.add(body);
 
-    // 2. Painéis Solares cobertos por poeira eletrostática espessa
+    // 2. Painéis Solares com poeira eletrostática espessa
     const dustPanelTexture = createSolarPanelTexture(true);
     const panelMat = new THREE.MeshStandardMaterial({
       map: dustPanelTexture,
-      roughness: 0.9,
+      roughness: 0.95,
       metalness: 0.1
     });
 
-    const panelGeo = new THREE.BoxGeometry(2.4, 0.05, 1.4);
+    const panelGeo = new THREE.BoxGeometry(2.5, 0.05, 1.4);
     const panel = new THREE.Mesh(panelGeo, panelMat);
     panel.position.set(0, 1.0, 0);
     panel.castShadow = true;
     this.group.add(panel);
 
-    // Camada física visível de regolito acumulado sobre as asas solares
-    const dustLayerGeo = new THREE.PlaneGeometry(2.35, 1.35);
+    // Camada física espessa de regolito acumulado sobre os painéis
+    const dustLayerGeo = new THREE.PlaneGeometry(2.45, 1.35);
     dustLayerGeo.rotateX(-Math.PI / 2);
     const dustLayerMat = new THREE.MeshStandardMaterial({
       color: 0x5a6067,
@@ -64,29 +65,46 @@ export class LostRover {
     dustLayer.position.set(0, 1.04, 0);
     this.group.add(dustLayer);
 
-    // 3. Mastro com câmera panorâmica e sensores estéreo (desativados)
-    const mastGeo = new THREE.CylinderGeometry(0.06, 0.08, 1.2, 8);
-    const mastMat = new THREE.MeshStandardMaterial({ color: 0x4b5563, metalness: 0.7 });
+    // 3. Braço robótico articulado de amostragem de regolito e gelo (desativado inclinado)
+    this.roboticArm = new THREE.Group();
+    this.roboticArm.position.set(0.65, 0.65, 0.85);
+
+    const armSegment1Geo = new THREE.CylinderGeometry(0.04, 0.04, 0.6, 8);
+    armSegment1Geo.rotateZ(Math.PI / 4);
+    const armMat = new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.8 });
+    const seg1 = new THREE.Mesh(armSegment1Geo, armMat);
+    seg1.position.set(0.2, 0.15, 0);
+    this.roboticArm.add(seg1);
+
+    const scoopGeo = new THREE.BoxGeometry(0.16, 0.1, 0.14);
+    const scoopMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: 0.9 });
+    const scoop = new THREE.Mesh(scoopGeo, scoopMat);
+    scoop.position.set(0.45, -0.05, 0);
+    this.roboticArm.add(scoop);
+    this.group.add(this.roboticArm);
+
+    // 4. Mastro com câmera de sensoriamento (desligada)
+    const mastGeo = new THREE.CylinderGeometry(0.05, 0.07, 1.2, 8);
+    const mastMat = new THREE.MeshStandardMaterial({ color: 0x374151, metalness: 0.7 });
     const mast = new THREE.Mesh(mastGeo, mastMat);
-    mast.position.set(0.4, 1.5, 0.7);
+    mast.position.set(-0.4, 1.5, 0.65);
     this.group.add(mast);
 
-    const cameraHeadGeo = new THREE.BoxGeometry(0.35, 0.2, 0.25);
-    const cameraHeadMat = new THREE.MeshStandardMaterial({ color: 0x1f2937, metalness: 0.9 });
-    const cameraHead = new THREE.Mesh(cameraHeadGeo, cameraHeadMat);
-    cameraHead.position.set(0.4, 2.1, 0.7);
-    this.group.add(cameraHead);
+    const camHeadGeo = new THREE.BoxGeometry(0.35, 0.18, 0.22);
+    const camHead = new THREE.Mesh(camHeadGeo, mastMat);
+    camHead.position.set(-0.4, 2.1, 0.65);
+    this.group.add(camHead);
 
-    // 4. Rodas metálicas presas no regolito fino da borda
-    const wheelGeo = new THREE.CylinderGeometry(0.35, 0.35, 0.28, 12);
+    // 5. 4 Rodas metálicas parcialmente soterradas no regolito
+    const wheelGeo = new THREE.CylinderGeometry(0.36, 0.36, 0.3, 12);
     wheelGeo.rotateZ(Math.PI / 2);
-    const wheelMat = new THREE.MeshStandardMaterial({ color: 0x374151, roughness: 0.8 });
+    const wheelMat = new THREE.MeshStandardMaterial({ color: 0x27272a, roughness: 0.85 });
 
     const wheelOffsets = [
-      { x: 1.0, z: 0.7 },
-      { x: -1.0, z: 0.7 },
-      { x: 1.0, z: -0.7 },
-      { x: -1.0, z: -0.7 }
+      { x: 1.05, z: 0.75 },
+      { x: -1.05, z: 0.75 },
+      { x: 1.05, z: -0.75 },
+      { x: -1.05, z: -0.75 }
     ];
 
     wheelOffsets.forEach((pos) => {
@@ -96,25 +114,25 @@ export class LostRover {
       this.group.add(wheel);
     });
 
-    // 5. LED de emergência piscando lentamente em âmbar
-    this.beaconLight = new THREE.PointLight(0xf59e0b, 1.8, 15);
-    this.beaconLight.position.set(0, 1.4, -0.6);
+    // 6. LED de emergência piscando lentamente em âmbar
+    this.beaconLight = new THREE.PointLight(0xf59e0b, 2.0, 16);
+    this.beaconLight.position.set(0, 1.45, -0.65);
     this.group.add(this.beaconLight);
 
     const ledGeo = new THREE.SphereGeometry(0.12, 8, 8);
     const ledMat = new THREE.MeshBasicMaterial({ color: 0xf59e0b });
     this.beaconLed = new THREE.Mesh(ledGeo, ledMat);
-    this.beaconLed.position.set(0, 1.4, -0.6);
+    this.beaconLed.position.set(0, 1.45, -0.65);
     this.group.add(this.beaconLed);
 
-    // 6. Holograma de alvo interativo para o resgate
-    const beaconRingsGeo = new THREE.RingGeometry(1.2, 1.4, 32);
+    // 7. Holograma de alvo interativo para o resgate
+    const beaconRingsGeo = new THREE.RingGeometry(1.2, 1.45, 32);
     beaconRingsGeo.rotateX(-Math.PI / 2);
     const beaconRingsMat = new THREE.MeshBasicMaterial({
       color: 0x00f0ff,
       side: THREE.DoubleSide,
       transparent: true,
-      opacity: 0.5
+      opacity: 0.55
     });
     this.interactionBeacon = new THREE.Mesh(beaconRingsGeo, beaconRingsMat);
     this.interactionBeacon.position.set(0, 0.1, 0);
@@ -123,16 +141,14 @@ export class LostRover {
 
   /** Atualiza o pulso do LED de emergência e rotação do anel interativo */
   public update(time: number): void {
-    // Pisca lentamente em âmbar (senoide suave com pulso)
     const pulse = Math.max(0.1, Math.sin(time * 3.0));
-    this.beaconLight.intensity = pulse * 2.2;
+    this.beaconLight.intensity = pulse * 2.5;
     (this.beaconLed.material as THREE.MeshBasicMaterial).color.setRGB(
       0.96 * pulse,
       0.62 * pulse,
       0.05 * pulse
     );
 
-    // Rotação suave do anel holográfico de resgate
     if (this.interactionBeacon) {
       this.interactionBeacon.rotation.z += 0.02;
     }

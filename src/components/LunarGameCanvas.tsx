@@ -101,6 +101,7 @@ export const LunarGameCanvas: React.FC<LunarGameCanvasProps> = ({
     const terrain = new LunarTerrain();
     scene.add(terrain.mesh);
     scene.add(terrain.rocksGroup);
+    scene.add(terrain.iceGroup);
 
     // 6. Sistema de Partículas da Tempestade de Regolito e Sistema de Poeira Balística das Rodas
     const dustStorm = new DustStormSystem(scene);
@@ -234,9 +235,10 @@ export const LunarGameCanvas: React.FC<LunarGameCanvasProps> = ({
       // 1. Rotação suave da Terra no horizonte
       skyAndLighting.updateEarthRotation(delta);
 
-      // 2. Animação de LED do rover perdido e antena
+      // 2. Animação de LED do rover perdido, antena e estroboscópio da estação
       lostRover.update(elapsedTime);
       playerRover.updateAntenna(elapsedTime);
+      station.update(elapsedTime, delta);
 
       // 3. Atualização de partículas das rodas no vácuo lunar
       wheelDust.update(delta);
@@ -305,8 +307,9 @@ export const LunarGameCanvas: React.FC<LunarGameCanvasProps> = ({
         playerRover.group.position.copy(roverPhysics.position);
         playerRover.group.quaternion.copy(roverPhysics.orientationQuaternion);
 
-        // Rotação das rodas e acionamento de luzes de freio
+        // Rotação das rodas, esterçamento e acionamento de luzes de freio
         playerRover.rotateWheels((roverPhysics.currentSpeedKmh / 3.6) * delta);
+        playerRover.updateSteering(inputs.left ? 1 : inputs.right ? -1 : 0, speedKmh, delta);
         playerRover.setBraking(inputs.brake);
 
         // Áudio procedural do motor modulado pela velocidade
