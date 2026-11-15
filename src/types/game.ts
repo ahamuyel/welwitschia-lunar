@@ -10,6 +10,8 @@ export type GameState =
   | 'STATE_STORM_DILEMMA'
   | 'STATE_RESCUE_AND_ISRU';
 
+export type ActiveUIPanel = 'none' | 'menu' | 'decision' | 'station-detail';
+
 export type WellyMood = 'NEUTRAL' | 'ALERT' | 'HAPPY';
 
 export type CameraViewMode = 'THIRD_PERSON' | 'COCKPIT';

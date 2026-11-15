@@ -39,6 +39,7 @@ export class VRManager {
   private isDragging: boolean = false;
   private lastTouchX: number = 0;
   private lastTouchY: number = 0;
+  private dragDistance: number = 0;
 
   // Gaze Fuse (Olhar fixo de 0.80s com anel de progresso circular nítido)
   private raycaster = new THREE.Raycaster();
@@ -121,6 +122,7 @@ export class VRManager {
   private bindEvents(): void {
     this.orientationHandler = (e: DeviceOrientationEvent) => {
       if (e.alpha !== null && e.beta !== null && e.gamma !== null) {
+        if (e.alpha === 0 && e.beta === 0 && e.gamma === 0) return;
         this.deviceAlpha = e.alpha;
         this.deviceBeta = e.beta;
         this.deviceGamma = e.gamma;
@@ -172,22 +174,26 @@ export class VRManager {
     this.isDragging = true;
     this.lastTouchX = clientX;
     this.lastTouchY = clientY;
+    this.dragDistance = 0;
   }
 
   public onPointerMove(clientX: number, clientY: number): void {
     if (!this.isDragging) return;
     const dx = clientX - this.lastTouchX;
     const dy = clientY - this.lastTouchY;
+    this.dragDistance += Math.hypot(dx, dy);
 
-    this.yaw -= dx * 0.0035;
-    this.pitch = Math.max(-1.45, Math.min(1.45, this.pitch - dy * 0.0035));
+    this.yaw -= dx * 0.004;
+    this.pitch = Math.max(-1.45, Math.min(1.45, this.pitch - dy * 0.004));
 
     this.lastTouchX = clientX;
     this.lastTouchY = clientY;
   }
 
-  public onPointerUp(): void {
+  public onPointerUp(): boolean {
+    const wasTap = this.isDragging && this.dragDistance < 14;
     this.isDragging = false;
+    return wasTap;
   }
 
   public getScreenAngle(): number {
@@ -201,11 +207,11 @@ export class VRManager {
   }
 
   /**
-   * Calcula o Quaternion de orientação do utilizador (Giroscópio ou Manual)
+   * Calcula o Quaternion de orientação do utilizador (Giroscópio calibrado do Edgar + offset tátil ou Manual 360°)
    */
   public getHeadOrientation(): THREE.Quaternion {
-    if (this.isVRActive && this.isGyroAvailable && !this.isDragging) {
-      const alpha = THREE.MathUtils.degToRad(this.deviceAlpha);
+    if (this.isVRActive && this.isGyroAvailable) {
+      const alpha = THREE.MathUtils.degToRad(this.deviceAlpha) + this.yaw;
       const beta = THREE.MathUtils.degToRad(this.deviceBeta);
       const gamma = THREE.MathUtils.degToRad(this.deviceGamma);
       const orient = THREE.MathUtils.degToRad(this.getScreenAngle());

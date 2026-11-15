@@ -1,5 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import type { GameState, ResourceState, TelemetryData, WellyMood } from '../types/game';
+import type {
+  GameState,
+  ResourceState,
+  TelemetryData,
+  WellyMood,
+  BaseInteriorState
+} from '../types/game';
 import { soundManager } from '../audio/SoundManager';
 
 interface WellyCopilotProps {
@@ -7,6 +13,7 @@ interface WellyCopilotProps {
   telemetry: TelemetryData;
   resources: ResourceState;
   gameState: GameState;
+  baseInterior?: BaseInteriorState;
 }
 
 const WELLY_TOAST_MESSAGES: Record<string, { text: string; mood: WellyMood }> = {
@@ -15,7 +22,7 @@ const WELLY_TOAST_MESSAGES: Record<string, { text: string; mood: WellyMood }> = 
     mood: 'HAPPY'
   },
   ON_DOME_ENTER: {
-    text: 'Cabine pressurizada! Olhe 0.8s para as estações 3D ou toque nelas.',
+    text: 'Cabine pressurizada! Olhe 0.8s ou toque nas 4 estações 3D.',
     mood: 'NEUTRAL'
   },
   ON_STORM_START: {
@@ -42,17 +49,23 @@ const WELLY_TOAST_MESSAGES: Record<string, { text: string; mood: WellyMood }> = 
 
 export const WellyCopilot: React.FC<WellyCopilotProps> = ({
   currentTrigger,
-  gameState
+  gameState,
+  baseInterior
 }) => {
-  const [visibleToast, setVisibleToast] = useState<{ text: string; mood: WellyMood } | null>(null);
+  const [isVisible, setIsVisible] = useState<boolean>(false);
+  const [toast, setToast] = useState<{ text: string; mood: WellyMood } | null>(null);
 
-  // Transforma as mensagens da Welly em notificações flutuantes leves (toast pills) que desaparecem após 4.5s
+  // Dispara toast de eventos do jogo e desmonta após 4 segundos
   useEffect(() => {
-    if (!currentTrigger || gameState === 'STATE_PROLOGUE') return;
+    if (!currentTrigger || gameState === 'STATE_PROLOGUE' || gameState === 'STATE_RESCUE_AND_ISRU') {
+      setIsVisible(false);
+      return;
+    }
     const msg = WELLY_TOAST_MESSAGES[currentTrigger];
     if (!msg) return;
 
-    setVisibleToast(msg);
+    setToast(msg);
+    setIsVisible(true);
     if (msg.mood === 'ALERT') {
       soundManager.playAlertSiren();
     } else {
@@ -60,32 +73,62 @@ export const WellyCopilot: React.FC<WellyCopilotProps> = ({
     }
 
     const timer = window.setTimeout(() => {
-      setVisibleToast(null);
-    }, 4500);
+      setIsVisible(false);
+      setToast(null);
+    }, 4000);
 
     return () => window.clearTimeout(timer);
   }, [currentTrigger, gameState]);
 
-  if (!visibleToast || gameState === 'STATE_PROLOGUE' || gameState === 'STATE_RESCUE_AND_ISRU') {
+  // Dispara toast educativo após decisão tática e desmonta após 4 segundos
+  useEffect(() => {
+    const fb = baseInterior?.lastConsequenceFeedback;
+    if (!fb) return;
+
+    setToast({
+      text: `${fb.title}: ${fb.scientificReason}`,
+      mood: fb.isPositive ? 'HAPPY' : 'ALERT'
+    });
+    setIsVisible(true);
+
+    const timer = window.setTimeout(() => {
+      setIsVisible(false);
+      setToast(null);
+    }, 4000);
+
+    return () => window.clearTimeout(timer);
+  }, [baseInterior?.lastConsequenceFeedback]);
+
+  if (
+    !isVisible ||
+    !toast ||
+    gameState === 'STATE_PROLOGUE' ||
+    gameState === 'STATE_RESCUE_AND_ISRU' ||
+    baseInterior?.activeEmergency ||
+    baseInterior?.valveCalibration.active
+  ) {
     return null;
   }
 
-  const isUrgent = visibleToast.mood === 'ALERT';
-  const isHappy = visibleToast.mood === 'HAPPY';
+  const isUrgent = toast.mood === 'ALERT';
+  const isHappy = toast.mood === 'HAPPY';
 
   return (
-    <div className="fixed top-12 inset-x-0 z-25 px-4 flex justify-center pointer-events-none select-none">
+    <div
+      className="fixed bottom-3 inset-x-0 z-25 px-3 flex justify-center pointer-events-none select-none"
+      style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+    >
       <div
-        className={`max-w-md px-3.5 py-1 rounded-full backdrop-blur-md border shadow-lg flex items-center gap-2 text-[11px] sm:text-xs font-medium transition-all ${
+        className={`max-w-[92vw] sm:max-w-lg px-3.5 py-1.5 rounded-full backdrop-blur-md border shadow-lg flex items-center gap-2 text-xs font-medium pointer-events-none ${
           isUrgent
-            ? 'bg-red-950/75 border-red-400/50 text-red-100'
+            ? 'bg-red-950/85 border-red-400/50 text-red-100'
             : isHappy
-            ? 'bg-emerald-950/75 border-emerald-400/50 text-emerald-100'
-            : 'bg-slate-950/65 border-white/15 text-slate-100'
+            ? 'bg-emerald-950/85 border-emerald-400/50 text-emerald-100'
+            : 'bg-slate-950/80 border-white/15 text-slate-100'
         }`}
       >
         <span className="shrink-0">{isUrgent ? '⚠️' : isHappy ? '🌱' : '🛰️'}</span>
-        <span className="truncate">{visibleToast.text}</span>
+        <span className="truncate">{toast.text}</span>
       </div>
     </div>
   );

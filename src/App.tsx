@@ -13,7 +13,8 @@ import type {
   MissionReport,
   CameraViewMode,
   BaseInteriorState,
-  BaseEmergencyType
+  BaseEmergencyType,
+  ActiveUIPanel
 } from './types/game';
 import { gameStateManager } from './state/GameStateManager';
 import { LunarGameCanvas, type TouchDriveInputs } from './components/LunarGameCanvas';
@@ -29,6 +30,7 @@ export function App() {
   const [resources, setResources] = useState<ResourceState>({ ...gameStateManager.resources });
   const [domeInteractions, setDomeInteractions] = useState<DomeInteractions>({ ...gameStateManager.domeInteractions });
   const [baseInterior, setBaseInterior] = useState<BaseInteriorState>({ ...gameStateManager.baseInterior });
+  const [activePanel, setActivePanel] = useState<ActiveUIPanel>('none');
   const [isVRActive, setIsVRActive] = useState<boolean>(true); // Modo VR ativado como padrão
   const [touchDriveInputs, setTouchDriveInputs] = useState<TouchDriveInputs>({
     forward: false,
@@ -87,6 +89,11 @@ export function App() {
     const unsubInterior = gameStateManager.subscribeBaseInterior((newInterior) => {
       setBaseInterior(newInterior);
       setDomeInteractions({ ...gameStateManager.domeInteractions });
+      if (newInterior.activeEmergency && !newInterior.valveCalibration.active) {
+        setActivePanel('decision');
+      } else {
+        setActivePanel((prev) => (prev === 'decision' ? 'none' : prev));
+      }
     });
 
     return () => {
@@ -266,15 +273,16 @@ export function App() {
         />
       )}
 
-      {/* 2. Copiloto IA Welly (Toast Pills flutuantes auto-descartáveis) */}
+      {/* 2. Copiloto IA Welly (Toast único discreto no rodapé que desmonta após 4s) */}
       <WellyCopilot
         currentTrigger={wellyTrigger}
         telemetry={telemetry}
         resources={resources}
         gameState={gameState}
+        baseInterior={baseInterior}
       />
 
-      {/* 3. Telas dos 5 Estados de Jogo (UI Minimalista Mobile-First) */}
+      {/* 3. Telas dos 5 Estados de Jogo (UI Minimalista Mobile-First com Estado Exclusivo activePanel) */}
       {gameState === 'STATE_PROLOGUE' && (
         <PrologueScreen onStartMission={handleStartMission} />
       )}
@@ -284,6 +292,8 @@ export function App() {
           resources={resources}
           interactions={domeInteractions}
           baseInterior={baseInterior}
+          activePanel={activePanel}
+          onChangeActivePanel={setActivePanel}
           isVRActive={isVRActive}
           onToggleVR={() => setIsVRActive((prev) => !prev)}
           onRedirectEnergy={handleRedirectEnergy}
@@ -301,6 +311,8 @@ export function App() {
         <RoverHUD
           telemetry={telemetry}
           resources={resources}
+          activePanel={activePanel}
+          onChangeActivePanel={setActivePanel}
           onToggleHeadlights={handleToggleHeadlights}
           onToggleCamera={handleToggleCamera}
           onExtractData={isNearLostRover ? handleExtractDataModule : undefined}

@@ -145,7 +145,8 @@ export const LunarGameCanvas: React.FC<LunarGameCanvasProps> = ({
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFShadowMap;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.05;
+    renderer.toneMappingExposure = 1.22;
+    renderer.domElement.style.touchAction = 'none';
     container.appendChild(renderer.domElement);
 
     // 2. Cena & Câmera
@@ -156,6 +157,7 @@ export const LunarGameCanvas: React.FC<LunarGameCanvasProps> = ({
       0.15,
       6000
     );
+    scene.add(camera);
 
     // 3. VR Manager (Head-Tracking, Quaternions calibrados e Gaze Fuse 0.85s)
     const vrManager = new VRManager(camera);
@@ -336,8 +338,9 @@ export const LunarGameCanvas: React.FC<LunarGameCanvasProps> = ({
     };
 
     const handlePointerUp = (e: PointerEvent) => {
-      vrManager.onPointerUp();
-      // Verificação de clique direto em terminais interativos
+      const wasTap = vrManager.onPointerUp();
+      if (!wasTap) return;
+      // Verificação de clique/toque direto em terminais interativos 3D
       const interactables: THREE.Object3D[] = [
         ...station.getInteractiveObjects(),
         lostRover.interactionBeacon

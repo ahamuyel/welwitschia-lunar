@@ -3,7 +3,7 @@
  * NASA Space Apps Challenge 2026 Angola
  */
 
-const CACHE_NAME = 'welwitschia-lunar-cache-v2026.6';
+const CACHE_NAME = 'welwitschia-lunar-cache-v2026.7';
 const CORE_ASSETS = ['/', '/index.html', '/favicon.svg', '/icons.svg'];
 
 self.addEventListener('install', (event) => {

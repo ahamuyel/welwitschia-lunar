@@ -473,6 +473,10 @@ class SoundManager {
     const freq = step === 1 ? 784 : 1046.5;
     this.playUiBeep(freq, 0.16);
   }
+
+  public isAudioMuted(): boolean {
+    return this.isMuted;
+  }
 }
 
 export const soundManager = new SoundManager();

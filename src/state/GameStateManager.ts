@@ -96,12 +96,12 @@ export class GameStateManager {
   public currentState: GameState = 'STATE_PROLOGUE';
 
   public resources: ResourceState = {
-    baseSolarEnergy: 60,  // Reduzido por poeira eletrostática nos painéis
-    baseOxygen: 85,
-    roverBattery: 20,     // Precisa de carga na cúpula
-    suitOxygen: 30,       // Precisa de recarga no painel de suporte de vida
-    roverIntegrity: 100,  // Integridade estrutural do chassi
-    marsFuelTank: 0       // Tanque criogênico do foguete de retorno/Marte
+    baseSolarEnergy: 80,
+    baseOxygen: 90,
+    roverBattery: 80,
+    suitOxygen: 90,
+    roverIntegrity: 100,
+    marsFuelTank: 0
   };
 
   public domeInteractions: DomeInteractions = {
@@ -112,7 +112,7 @@ export class GameStateManager {
   };
 
   public baseInterior: BaseInteriorState = {
-    ledState: 'ALERT',
+    ledState: 'NORMAL',
     cabinTempC: 21,
     baseIntegrity: 100,
     shieldActive: false,
@@ -120,9 +120,9 @@ export class GameStateManager {
     greenhouseHealthy: true,
     labPaused: false,
     activeHologram: 'MOON',
-    discoveriesUnlocked: 1,
-    lastDiscoveryTitle: 'Topografia Polar de Shackleton (Lua)',
-    activeEmergency: BASE_EMERGENCY_CATALOG.ELECTROSTATIC_DUST,
+    discoveriesUnlocked: 0,
+    lastDiscoveryTitle: '',
+    activeEmergency: null,
     valveCalibration: {
       active: false,
       timeRemainingSec: 12,
@@ -494,7 +494,12 @@ export class GameStateManager {
   }
 
   public viewBriefing(): void {
-    this.domeInteractions.briefingViewed = true;
+    if (!this.domeInteractions.briefingViewed) {
+      this.domeInteractions.briefingViewed = true;
+      this.unlockDiscovery('MOON', 'Topografia Polar de Shackleton (Lua)');
+    } else {
+      this.cycleHologramDiscovery();
+    }
     soundManager.playUiBeep(650, 0.08);
     this.notifyBaseInterior();
   }
@@ -662,10 +667,10 @@ export class GameStateManager {
 
   public resetMission(): void {
     this.resources = {
-      baseSolarEnergy: 60,
-      baseOxygen: 85,
-      roverBattery: 20,
-      suitOxygen: 30,
+      baseSolarEnergy: 80,
+      baseOxygen: 90,
+      roverBattery: 80,
+      suitOxygen: 90,
       roverIntegrity: 100,
       marsFuelTank: 0
     };
@@ -676,7 +681,7 @@ export class GameStateManager {
       airlockOpened: false
     };
     this.baseInterior = {
-      ledState: 'ALERT',
+      ledState: 'NORMAL',
       cabinTempC: 21,
       baseIntegrity: 100,
       shieldActive: false,
@@ -684,9 +689,9 @@ export class GameStateManager {
       greenhouseHealthy: true,
       labPaused: false,
       activeHologram: 'MOON',
-      discoveriesUnlocked: 1,
-      lastDiscoveryTitle: 'Topografia Polar de Shackleton (Lua)',
-      activeEmergency: BASE_EMERGENCY_CATALOG.ELECTROSTATIC_DUST,
+      discoveriesUnlocked: 0,
+      lastDiscoveryTitle: '',
+      activeEmergency: null,
       valveCalibration: {
         active: false,
         timeRemainingSec: 12,

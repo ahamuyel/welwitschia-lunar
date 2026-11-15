@@ -67,6 +67,8 @@ export class WelwitschiaStation {
     THREE.MeshBasicMaterial[]
   > = new Map();
   private targetLedColor: THREE.Color = new THREE.Color(0x00f0ff);
+  private floorGuideMat!: THREE.MeshStandardMaterial;
+  private cabinAirParticles!: THREE.Points;
 
   private lastInteriorState: BaseInteriorState | null = null;
   private lastResourcesState: ResourceState | null = null;
@@ -264,9 +266,11 @@ export class WelwitschiaStation {
       roughness: 0.28
     });
     const cabinRibMat = new THREE.MeshStandardMaterial({
-      color: 0x334155,
-      metalness: 0.8,
-      roughness: 0.35
+      color: 0x64748b,
+      metalness: 0.35,
+      roughness: 0.38,
+      emissive: 0x0f172a,
+      emissiveIntensity: 0.25
     });
 
     // 8 Grandes Arcos Metálicos que convergem no anel central superior
@@ -280,7 +284,7 @@ export class WelwitschiaStation {
       arch.castShadow = true;
       this.group.add(arch);
 
-      // Nervura estrutural interna acolhedora
+      // Nervura estrutural interna acolhedora e iluminada
       const innerRibGeo = new THREE.TorusGeometry(11.8, 0.14, 8, 32, Math.PI);
       innerRibGeo.rotateZ(Math.PI / 2);
       const innerRib = new THREE.Mesh(innerRibGeo, cabinRibMat);
@@ -296,17 +300,40 @@ export class WelwitschiaStation {
     oculus.position.y = 1.2 + domeRadius;
     this.group.add(oculus);
 
-    // Piso Técnico da Cabine Pressurizada
+    // Piso Técnico da Cabine: Grelha Modular Metálica Clara (color: 0x3b485e, roughness: 0.45, metalness: 0.35)
+    const floorGridTex = this.createModularFloorTexture();
     const cabinFloorGeo = new THREE.CylinderGeometry(11.8, 12.0, 0.18, 36);
     const cabinFloorMat = new THREE.MeshStandardMaterial({
-      color: 0x1e293b,
-      roughness: 0.55,
-      metalness: 0.65
+      color: 0x3b485e,
+      map: floorGridTex,
+      roughness: 0.45,
+      metalness: 0.35,
+      emissive: 0x0f2942,
+      emissiveIntensity: 0.32
     });
     const cabinFloor = new THREE.Mesh(cabinFloorGeo, cabinFloorMat);
     cabinFloor.position.set(0, 1.25, 0);
     cabinFloor.receiveShadow = true;
     this.group.add(cabinFloor);
+
+    // Faixas Guia Luminosas no Chão (emissive: 0x00d8ff, emissiveIntensity: 0.65) ligando o centro às 4 estações
+    this.floorGuideMat = new THREE.MeshStandardMaterial({
+      color: 0x38bdf8,
+      emissive: 0x00d8ff,
+      emissiveIntensity: 0.65,
+      roughness: 0.25,
+      metalness: 0.2
+    });
+
+    const guideAngles = [0, Math.PI / 2, Math.PI, (Math.PI * 3) / 2, Math.PI * 1.25];
+    guideAngles.forEach((angle) => {
+      const stripGeo = new THREE.BoxGeometry(0.24, 0.02, 3.6);
+      const strip = new THREE.Mesh(stripGeo, this.floorGuideMat);
+      const dist = 3.45;
+      strip.position.set(Math.sin(angle) * dist, 1.355, Math.cos(angle) * dist);
+      strip.rotation.y = angle;
+      this.group.add(strip);
+    });
 
     // 3. Iluminação LED Perimetral Dinâmica no Chão e no Teto (Ciano / Âmbar / Vermelho / Azul Gelo)
     this.floorLedMat = new THREE.MeshBasicMaterial({ color: 0x00f0ff });
@@ -349,6 +376,9 @@ export class WelwitschiaStation {
     this.buildStationC_WelwitschiaGreenhouse();
     this.buildStationD_HolographicScienceLab();
 
+    // Partículas suaves de ar purificado e energia flutuando no interior da cabine
+    this.buildCabinAirParticles();
+
     // Terminais Holográficos 3D Interativos (posicionamento ergonómico a 2.8m do jogador)
     const terminalDefs = [
       { id: 'ENERGY', x: 2.9, z: 0, title: '[1] BLINDAGEM SOLAR // ENERGIA', color: '#ffb84d' },
@@ -360,7 +390,7 @@ export class WelwitschiaStation {
     terminalDefs.forEach((def) => {
       const { canvas, texture } = this.createTerminalCanvas(
         def.title,
-        '[OLHAR 0.85s OU TOQUE PARA ATIVAR]',
+        '[OLHAR 0.8s OU TOQUE PARA ATIVAR]',
         'ESTAÇÃO OPERACIONAL',
         false,
         def.color
@@ -382,21 +412,137 @@ export class WelwitschiaStation {
       this.group.add(scr);
     });
 
-    // Painéis 3D Flutuantes de Decisão Tática (Opção A vs Opção B) por Gaze Fuse (0.85s)
+    // Painéis 3D Flutuantes de Decisão Tática (Opção A vs Opção B) por Gaze Fuse (0.8s)
     this.buildTacticalDecision3DPanels();
 
-    // Luz Geral Interna da Cúpula (Acolhedora)
-    const intLight = new THREE.PointLight(0xffeedd, 3.0, 45, 1.4);
-    intLight.position.set(0, 8.8, 0);
+    // PointLight Principal de Teto Branca-Azulada Suave no centro superior da base
+    const intLight = new THREE.PointLight(0xe0f2fe, 2.2, 22, 1.5);
+    intLight.position.set(0, 7.6, 0);
     intLight.castShadow = true;
     this.group.add(intLight);
 
-    // Luz Hortícola Magenta/Rosa Suave sobre a Estufa Interior
-    const ghLight = new THREE.PointLight(0xec4899, 2.8, 22, 1.2);
-    ghLight.position.set(-5.2, 4.8, 0);
+    // Preenchimento hemisférico interno suave para iluminar a grelha do pavimento sem sombras escuras
+    const cabinHemiLight = new THREE.HemisphereLight(0xe0f2fe, 0x3b485e, 1.15);
+    cabinHemiLight.position.set(0, 8.0, 0);
+    this.group.add(cabinHemiLight);
+
+    // 4 Luzes de Destaque Coloridas nas 4 Estações (Ciano, Dourado/Âmbar, Magenta/Verde, Violeta)
+    const o2AccentLight = new THREE.PointLight(0x00f0ff, 1.9, 12, 1.4);
+    o2AccentLight.position.set(0, 3.6, -4.8);
+    this.group.add(o2AccentLight);
+
+    const shieldAccentLight = new THREE.PointLight(0xffb84d, 1.9, 12, 1.4);
+    shieldAccentLight.position.set(4.8, 3.6, 0);
+    this.group.add(shieldAccentLight);
+
+    // Luz Hortícola Magenta + Verde Vivo sobre a Estufa Welwitschia
+    const ghLight = new THREE.PointLight(0x22c55e, 2.2, 14, 1.3);
+    ghLight.position.set(-4.8, 3.6, 0);
     this.group.add(ghLight);
 
+    const ghMagentaLight = new THREE.PointLight(0xf472b6, 1.6, 12, 1.4);
+    ghMagentaLight.position.set(-5.2, 4.5, 0);
+    this.group.add(ghMagentaLight);
+
+    // Luz Violeta no Laboratório Científico Holográfico
+    const labVioletLight = new THREE.PointLight(0xa855f7, 2.0, 12, 1.4);
+    labVioletLight.position.set(-3.5, 3.6, -3.5);
+    this.group.add(labVioletLight);
+
     return { intLight, ghLight };
+  }
+
+  /**
+   * Gera textura de grelha modular metálica clara com linhas técnicas luminosas para o pavimento da cabine.
+   */
+  private createModularFloorTexture(): THREE.CanvasTexture {
+    const canvas = document.createElement('canvas');
+    canvas.width = 512;
+    canvas.height = 512;
+    const ctx = canvas.getContext('2d')!;
+
+    ctx.fillStyle = '#3b485e';
+    ctx.fillRect(0, 0, 512, 512);
+
+    // Placas metálicas modulares
+    ctx.strokeStyle = '#52637d';
+    ctx.lineWidth = 4;
+    for (let i = 0; i <= 512; i += 64) {
+      ctx.beginPath();
+      ctx.moveTo(i, 0);
+      ctx.lineTo(i, 512);
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.moveTo(0, i);
+      ctx.lineTo(512, i);
+      ctx.stroke();
+    }
+
+    // Sub-grelha técnica ciano suave
+    ctx.strokeStyle = 'rgba(0, 216, 255, 0.28)';
+    ctx.lineWidth = 2;
+    for (let i = 32; i < 512; i += 64) {
+      ctx.beginPath();
+      ctx.moveTo(i, 0);
+      ctx.lineTo(i, 512);
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.moveTo(0, i);
+      ctx.lineTo(512, i);
+      ctx.stroke();
+    }
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.wrapS = THREE.RepeatWrapping;
+    texture.wrapT = THREE.RepeatWrapping;
+    texture.repeat.set(6, 6);
+    return texture;
+  }
+
+  /**
+   * Cria partículas suaves de ar purificado e energia flutuando no interior da cabine.
+   */
+  private buildCabinAirParticles(): void {
+    const count = 90;
+    const positions = new Float32Array(count * 3);
+    const colors = new Float32Array(count * 3);
+
+    for (let i = 0; i < count; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const radius = 1.2 + Math.random() * 7.8;
+      positions[i * 3] = Math.cos(angle) * radius;
+      positions[i * 3 + 1] = 1.5 + Math.random() * 5.2;
+      positions[i * 3 + 2] = Math.sin(angle) * radius;
+
+      // Alterna entre ciano (O2 purificado) e verde-esmeralda (fotossíntese Welwitschia)
+      if (i % 3 === 0) {
+        colors[i * 3] = 0.2;
+        colors[i * 3 + 1] = 0.95;
+        colors[i * 3 + 2] = 0.55;
+      } else {
+        colors[i * 3] = 0.0;
+        colors[i * 3 + 1] = 0.88;
+        colors[i * 3 + 2] = 1.0;
+      }
+    }
+
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+    const mat = new THREE.PointsMaterial({
+      size: 0.085,
+      vertexColors: true,
+      transparent: true,
+      opacity: 0.72,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false
+    });
+
+    this.cabinAirParticles = new THREE.Points(geo, mat);
+    this.group.add(this.cabinAirParticles);
   }
 
   /**
@@ -1076,18 +1222,35 @@ export class WelwitschiaStation {
     this.welwitschiaPlants.forEach((plant, idx) => {
       if (healthy) {
         plant.mat.color.setHex(0x22c55e);
-        plant.mat.emissive.setHex(0x052e16);
+        plant.mat.emissive.setHex(0x16a34a);
+        plant.mat.emissiveIntensity = 0.55;
         const breeze = Math.sin(time * 1.8 + idx) * 0.04;
         plant.leafLeft.rotation.z = 0.18 + breeze;
         plant.leafRight.rotation.z = -0.18 - breeze;
       } else {
         // Inclinadas e amareladas por frio ou falta de energia
         plant.mat.color.setHex(0xeab308);
-        plant.mat.emissive.setHex(0x422006);
+        plant.mat.emissive.setHex(0x854d0e);
+        plant.mat.emissiveIntensity = 0.35;
         plant.leafLeft.rotation.z = -0.28;
         plant.leafRight.rotation.z = 0.28;
       }
     });
+
+    // 4b. Faixas guia luminosas no chão e partículas suaves de ar purificado/energia flutuando
+    if (this.floorGuideMat) {
+      this.floorGuideMat.emissiveIntensity = 0.65 + Math.sin(time * 2.4) * 0.12;
+    }
+    if (this.cabinAirParticles) {
+      this.cabinAirParticles.rotation.y = time * 0.06;
+      const posAttr = this.cabinAirParticles.geometry.getAttribute('position') as THREE.BufferAttribute;
+      for (let i = 0; i < posAttr.count; i++) {
+        let y = posAttr.getY(i) + delta * 0.22;
+        if (y > 6.8) y = 1.5;
+        posAttr.setY(i, y);
+      }
+      posAttr.needsUpdate = true;
+    }
 
     // 5. Mesa Holográfica do Laboratório Científico (Rotação contínua da Lua, Terra ou Cristal de Gelo)
     if (this.hologramRoot) {
