@@ -14,6 +14,61 @@ export type WellyMood = 'NEUTRAL' | 'ALERT' | 'HAPPY';
 
 export type CameraViewMode = 'THIRD_PERSON' | 'COCKPIT';
 
+export type BaseLedState = 'NORMAL' | 'ALERT' | 'EMERGENCY' | 'HYPOTHERMIA';
+
+export type BaseEmergencyType =
+  | 'SOLAR_STORM'
+  | 'LUNAR_NIGHT_COLD'
+  | 'ELECTROSTATIC_DUST'
+  | 'OXYGEN_LEAK';
+
+export type HologramModelType = 'MOON' | 'EARTH' | 'ICE_CRYSTAL';
+
+export interface BaseEmergencyEvent {
+  type: BaseEmergencyType;
+  title: string;
+  stationId: 'SHIELD' | 'GREENHOUSE' | 'ENERGY' | 'OXYGEN';
+  stationName: string;
+  description: string;
+  ledState: BaseLedState;
+  optionA: {
+    label: string;
+    costText: string;
+  };
+  optionB: {
+    label: string;
+    costText: string;
+  };
+}
+
+export interface ValveCalibrationState {
+  active: boolean;
+  timeRemainingSec: number;
+  valve1Calibrated: boolean;
+  valve2Calibrated: boolean;
+}
+
+export interface BaseInteriorState {
+  ledState: BaseLedState;
+  cabinTempC: number;
+  baseIntegrity: number;
+  shieldActive: boolean;
+  frostLevel: number; // 0 a 1 (geada nas janelas no frio extremo)
+  greenhouseHealthy: boolean;
+  labPaused: boolean;
+  activeHologram: HologramModelType;
+  discoveriesUnlocked: number;
+  lastDiscoveryTitle: string;
+  activeEmergency: BaseEmergencyEvent | null;
+  valveCalibration: ValveCalibrationState;
+  lastConsequenceFeedback: {
+    title: string;
+    scientificReason: string;
+    choiceLabel: string;
+    isPositive: boolean;
+  } | null;
+}
+
 export interface TelemetryData {
   speedKmh: number;
   headingDeg: number;

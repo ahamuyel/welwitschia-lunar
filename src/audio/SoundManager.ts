@@ -354,6 +354,125 @@ class SoundManager {
     }
     return this.isMuted;
   }
+
+  // --- SONS SENSORIAIS DAS EMERGÊNCIAS DA BASE ---
+
+  public playSolarStormAlert(): void {
+    if (!this.ensureContext() || !this.ctx || this.isMuted) return;
+    try {
+      const t = this.ctx.currentTime;
+      const osc = this.ctx.createOscillator();
+      const sub = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(320, t);
+      osc.frequency.linearRampToValueAtTime(640, t + 0.25);
+      osc.frequency.linearRampToValueAtTime(280, t + 0.55);
+
+      sub.type = 'sine';
+      sub.frequency.setValueAtTime(85, t);
+
+      gain.gain.setValueAtTime(0.14, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.6);
+
+      osc.connect(gain);
+      sub.connect(gain);
+      gain.connect(this.ctx.destination);
+
+      osc.start(t);
+      sub.start(t);
+      osc.stop(t + 0.62);
+      sub.stop(t + 0.62);
+    } catch {
+      // Ignora erro
+    }
+  }
+
+  public playColdFrostSound(): void {
+    if (!this.ensureContext() || !this.ctx || this.isMuted) return;
+    try {
+      const t = this.ctx.currentTime;
+      const freqs = [1480, 1960, 2480];
+      freqs.forEach((f, idx) => {
+        if (!this.ctx) return;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(f, t + idx * 0.08);
+        osc.frequency.exponentialRampToValueAtTime(f * 0.75, t + idx * 0.08 + 0.35);
+
+        gain.gain.setValueAtTime(0.08, t + idx * 0.08);
+        gain.gain.exponentialRampToValueAtTime(0.0001, t + idx * 0.08 + 0.38);
+
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(t + idx * 0.08);
+        osc.stop(t + idx * 0.08 + 0.4);
+      });
+    } catch {
+      // Ignora erro
+    }
+  }
+
+  public playOxygenHissSound(): void {
+    if (!this.ensureContext() || !this.ctx || this.isMuted) return;
+    try {
+      const bufferSize = Math.floor(this.ctx.sampleRate * 0.9);
+      const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) {
+        data[i] = Math.random() * 2 - 1;
+      }
+
+      const noise = this.ctx.createBufferSource();
+      noise.buffer = buffer;
+
+      const filter = this.ctx.createBiquadFilter();
+      filter.type = 'highpass';
+      filter.frequency.setValueAtTime(2400, this.ctx.currentTime);
+
+      const gain = this.ctx.createGain();
+      gain.gain.setValueAtTime(0.14, this.ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.88);
+
+      noise.connect(filter);
+      filter.connect(gain);
+      gain.connect(this.ctx.destination);
+      noise.start();
+    } catch {
+      // Ignora erro
+    }
+  }
+
+  public playElectrostaticPulseSound(): void {
+    if (!this.ensureContext() || !this.ctx || this.isMuted) return;
+    try {
+      const t = this.ctx.currentTime;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(180, t);
+      osc.frequency.exponentialRampToValueAtTime(1600, t + 0.32);
+
+      gain.gain.setValueAtTime(0.16, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
+
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+      osc.start(t);
+      osc.stop(t + 0.36);
+    } catch {
+      // Ignora erro
+    }
+  }
+
+  public playValveCalibratedBeep(step: number = 1): void {
+    if (!this.ensureContext() || !this.ctx || this.isMuted) return;
+    const freq = step === 1 ? 784 : 1046.5;
+    this.playUiBeep(freq, 0.16);
+  }
 }
 
 export const soundManager = new SoundManager();

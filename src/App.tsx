@@ -5,9 +5,17 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import type { GameState, ResourceState, TelemetryData, DomeInteractions, MissionReport, CameraViewMode } from './types/game';
+import type {
+  GameState,
+  ResourceState,
+  TelemetryData,
+  DomeInteractions,
+  MissionReport,
+  CameraViewMode,
+  BaseInteriorState,
+  BaseEmergencyType
+} from './types/game';
 import { gameStateManager } from './state/GameStateManager';
-import { soundManager } from './audio/SoundManager';
 import { LunarGameCanvas, type TouchDriveInputs } from './components/LunarGameCanvas';
 import { WellyCopilot } from './ui/WellyCopilot';
 import { PrologueScreen } from './ui/PrologueScreen';
@@ -15,12 +23,12 @@ import { DomeManagementScreen } from './ui/DomeManagementScreen';
 import { RoverHUD } from './ui/RoverHUD';
 import { StormDilemmaModal } from './ui/StormDilemmaModal';
 import { RescueAndISRUScreen } from './ui/RescueAndISRUScreen';
-import { ControlsHelp } from './ui/ControlsHelp';
 
 export function App() {
   const [gameState, setGameState] = useState<GameState>(gameStateManager.currentState);
   const [resources, setResources] = useState<ResourceState>({ ...gameStateManager.resources });
   const [domeInteractions, setDomeInteractions] = useState<DomeInteractions>({ ...gameStateManager.domeInteractions });
+  const [baseInterior, setBaseInterior] = useState<BaseInteriorState>({ ...gameStateManager.baseInterior });
   const [isVRActive, setIsVRActive] = useState<boolean>(true); // Modo VR ativado como padrão
   const [touchDriveInputs, setTouchDriveInputs] = useState<TouchDriveInputs>({
     forward: false,
@@ -49,7 +57,6 @@ export function App() {
   const [wellyTrigger, setWellyTrigger] = useState<string>('ON_START');
   const [isNearLostRover, setIsNearLostRover] = useState<boolean>(false);
   const [missionReport, setMissionReport] = useState<MissionReport | null>(null);
-  const [isMuted, setIsMuted] = useState<boolean>(false);
   const [cameraMode, setCameraMode] = useState<CameraViewMode>('THIRD_PERSON');
 
   const highSpeedWarningCooldown = useRef<boolean>(false);
@@ -77,9 +84,15 @@ export function App() {
       setResources(newResources);
     });
 
+    const unsubInterior = gameStateManager.subscribeBaseInterior((newInterior) => {
+      setBaseInterior(newInterior);
+      setDomeInteractions({ ...gameStateManager.domeInteractions });
+    });
+
     return () => {
       unsubState();
       unsubResources();
+      unsubInterior();
     };
   }, []);
 
@@ -91,7 +104,9 @@ export function App() {
       const delta = (now - lastTime) / 1000;
       lastTime = now;
 
-      if (gameState === 'STATE_ROVER_EXPLORATION' || gameState === 'STATE_STORM_DILEMMA') {
+      if (gameState === 'STATE_DOME_MANAGEMENT') {
+        gameStateManager.updateBaseInterior(delta);
+      } else if (gameState === 'STATE_ROVER_EXPLORATION' || gameState === 'STATE_STORM_DILEMMA') {
         gameStateManager.updateResources(delta, telemetry.speedKmh, telemetry.isHeadlightsOn);
         gameStateManager.checkStormDistance(telemetry.distanceToTargetM);
       }
@@ -123,6 +138,25 @@ export function App() {
 
   const handleOpenAirlock = useCallback(() => {
     gameStateManager.openAirlock();
+    setDomeInteractions({ ...gameStateManager.domeInteractions });
+  }, []);
+
+  const handleTriggerEmergency = useCallback((type: BaseEmergencyType) => {
+    gameStateManager.triggerBaseEmergency(type);
+  }, []);
+
+  const handleResolveEmergencyChoice = useCallback((choice: 'A' | 'B') => {
+    gameStateManager.resolveBaseEmergencyChoice(choice);
+    setDomeInteractions({ ...gameStateManager.domeInteractions });
+  }, []);
+
+  const handleCalibrateValve = useCallback((valveIndex: 1 | 2) => {
+    gameStateManager.calibrateOxygenValve(valveIndex);
+    setDomeInteractions({ ...gameStateManager.domeInteractions });
+  }, []);
+
+  const handleCycleHologram = useCallback(() => {
+    gameStateManager.cycleHologramDiscovery();
     setDomeInteractions({ ...gameStateManager.domeInteractions });
   }, []);
 
@@ -190,11 +224,6 @@ export function App() {
     setWellyTrigger('ON_START');
   }, []);
 
-  const handleToggleMute = useCallback(() => {
-    const muted = soundManager.toggleMute();
-    setIsMuted(muted);
-  }, []);
-
   return (
     <div className="relative w-screen h-screen overflow-hidden bg-black font-sans select-none">
       {/* 1. Viewport 3D Three.js com Post-Processing, Física Avançada e WebVR */}
@@ -213,10 +242,14 @@ export function App() {
         onToggleVR={() => setIsVRActive((prev) => !prev)}
         domeInteractions={domeInteractions}
         resources={resources}
+        baseInterior={baseInterior}
         onRedirectEnergy={handleRedirectEnergy}
         onRefillSuitOxygen={handleRefillSuitOxygen}
         onViewBriefing={handleViewBriefing}
         onOpenAirlock={handleOpenAirlock}
+        onResolveEmergencyChoice={handleResolveEmergencyChoice}
+        onCalibrateValve={handleCalibrateValve}
+        onCycleHologram={handleCycleHologram}
         touchDriveInputs={touchDriveInputs}
       />
 
@@ -233,33 +266,7 @@ export function App() {
         />
       )}
 
-      {/* 2. Botão Flutuante de Silenciar Áudio e Alternar VR */}
-      <div className="fixed top-4 left-4 z-50 flex items-center gap-2">
-        <button
-          onClick={handleToggleMute}
-          className="p-2.5 rounded-full bg-slate-950/80 border border-slate-800 text-slate-300 hover:text-white shadow-lg backdrop-blur-md cursor-pointer transition-all"
-          title={isMuted ? 'Desmutar áudio' : 'Silenciar áudio'}
-        >
-          {isMuted ? '🔇' : '🔊'}
-        </button>
-
-        {gameState === 'STATE_DOME_MANAGEMENT' && (
-          <button
-            onClick={() => setIsVRActive((prev) => !prev)}
-            className="px-3 py-2 rounded-xl border text-xs font-mono font-bold backdrop-blur-md shadow-lg transition-all cursor-pointer"
-            style={{
-              borderColor: isVRActive ? '#00e5ff' : '#ffd27a',
-              color: isVRActive ? '#00e5ff' : '#ffd27a',
-              backgroundColor: 'rgba(5, 14, 36, 0.88)'
-            }}
-            title="Alternar entre Modo VR (Imersivo com Giroscópio) e Modo Normal 360°"
-          >
-            {isVRActive ? '🥽 Modo: VR [Ativo]' : '📱 Modo: Normal 360°'}
-          </button>
-        )}
-      </div>
-
-      {/* 3. Copiloto IA Welly (Fila Sequencial, Chat Conversacional Híbrido e Voz) */}
+      {/* 2. Copiloto IA Welly (Toast Pills flutuantes auto-descartáveis) */}
       <WellyCopilot
         currentTrigger={wellyTrigger}
         telemetry={telemetry}
@@ -267,7 +274,7 @@ export function App() {
         gameState={gameState}
       />
 
-      {/* 4. Telas dos 5 Estados de Jogo */}
+      {/* 3. Telas dos 5 Estados de Jogo (UI Minimalista Mobile-First) */}
       {gameState === 'STATE_PROLOGUE' && (
         <PrologueScreen onStartMission={handleStartMission} />
       )}
@@ -276,27 +283,31 @@ export function App() {
         <DomeManagementScreen
           resources={resources}
           interactions={domeInteractions}
+          baseInterior={baseInterior}
+          isVRActive={isVRActive}
+          onToggleVR={() => setIsVRActive((prev) => !prev)}
           onRedirectEnergy={handleRedirectEnergy}
           onRefillSuitOxygen={handleRefillSuitOxygen}
           onViewBriefing={handleViewBriefing}
           onOpenAirlock={handleOpenAirlock}
+          onTriggerEmergency={handleTriggerEmergency}
+          onResolveEmergencyChoice={handleResolveEmergencyChoice}
+          onCalibrateValve={handleCalibrateValve}
+          onCycleHologram={handleCycleHologram}
         />
       )}
 
       {(gameState === 'STATE_ROVER_EXPLORATION' || gameState === 'STATE_STORM_DILEMMA') && (
-        <>
-          <RoverHUD
-            telemetry={telemetry}
-            resources={resources}
-            onToggleHeadlights={handleToggleHeadlights}
-            onToggleCamera={handleToggleCamera}
-            onExtractData={isNearLostRover ? handleExtractDataModule : undefined}
-            isVRActive={isVRActive}
-            onToggleVR={() => setIsVRActive((prev) => !prev)}
-            onTouchDriveInputs={setTouchDriveInputs}
-          />
-          <ControlsHelp />
-        </>
+        <RoverHUD
+          telemetry={telemetry}
+          resources={resources}
+          onToggleHeadlights={handleToggleHeadlights}
+          onToggleCamera={handleToggleCamera}
+          onExtractData={isNearLostRover ? handleExtractDataModule : undefined}
+          isVRActive={isVRActive}
+          onToggleVR={() => setIsVRActive((prev) => !prev)}
+          onTouchDriveInputs={setTouchDriveInputs}
+        />
       )}
 
       {gameState === 'STATE_STORM_DILEMMA' && !gameStateManager.stormChoiceMade && (

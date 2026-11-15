@@ -11,7 +11,14 @@ import * as THREE from 'three';
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
-import type { GameState, TelemetryData, CameraViewMode, DomeInteractions, ResourceState } from '../types/game';
+import type {
+  GameState,
+  TelemetryData,
+  CameraViewMode,
+  DomeInteractions,
+  ResourceState,
+  BaseInteriorState
+} from '../types/game';
 import { LunarTerrain } from '../world/LunarTerrain';
 import { SkyAndLighting } from '../world/SkyAndLighting';
 import { DustStormSystem } from '../world/DustStormSystem';
@@ -49,10 +56,14 @@ interface LunarGameCanvasProps {
   onToggleVR?: () => void;
   domeInteractions: DomeInteractions;
   resources: ResourceState;
+  baseInterior: BaseInteriorState;
   onRedirectEnergy: () => void;
   onRefillSuitOxygen: () => void;
   onViewBriefing: () => void;
   onOpenAirlock: () => void;
+  onResolveEmergencyChoice: (choice: 'A' | 'B') => void;
+  onCalibrateValve: (valveIndex: 1 | 2) => void;
+  onCycleHologram: () => void;
   touchDriveInputs?: TouchDriveInputs;
 }
 
@@ -70,10 +81,14 @@ export const LunarGameCanvas: React.FC<LunarGameCanvasProps> = ({
   isVRActive,
   domeInteractions,
   resources,
+  baseInterior,
   onRedirectEnergy,
   onRefillSuitOxygen,
   onViewBriefing,
   onOpenAirlock,
+  onResolveEmergencyChoice,
+  onCalibrateValve,
+  onCycleHologram,
   touchDriveInputs
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -83,6 +98,7 @@ export const LunarGameCanvas: React.FC<LunarGameCanvasProps> = ({
   const isVRActiveRef = useRef<boolean>(isVRActive);
   const domeInteractionsRef = useRef<DomeInteractions>(domeInteractions);
   const resourcesRef = useRef<ResourceState>(resources);
+  const baseInteriorRef = useRef<BaseInteriorState>(baseInterior);
   const touchDriveInputsRef = useRef<TouchDriveInputs | undefined>(touchDriveInputs);
 
   const vrManagerRef = useRef<VRManager | null>(null);
@@ -111,6 +127,10 @@ export const LunarGameCanvas: React.FC<LunarGameCanvasProps> = ({
   }, [resources]);
 
   useEffect(() => {
+    baseInteriorRef.current = baseInterior;
+  }, [baseInterior]);
+
+  useEffect(() => {
     touchDriveInputsRef.current = touchDriveInputs;
   }, [touchDriveInputs]);
 
@@ -118,9 +138,9 @@ export const LunarGameCanvas: React.FC<LunarGameCanvasProps> = ({
     const container = containerRef.current;
     if (!container) return;
 
-    // 1. Inicialização do Three.js WebGLRenderer com ACESFilmicToneMapping
+    // 1. Inicialização do Three.js WebGLRenderer otimizado para Mobile 60 FPS (pixelRatio máx 1.75)
     const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.75));
     renderer.setSize(container.clientWidth, container.clientHeight);
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFShadowMap;
@@ -202,6 +222,21 @@ export const LunarGameCanvas: React.FC<LunarGameCanvasProps> = ({
           break;
         case 'AIRLOCK':
           onOpenAirlock();
+          break;
+        case 'DECISION_A':
+          onResolveEmergencyChoice('A');
+          break;
+        case 'DECISION_B':
+          onResolveEmergencyChoice('B');
+          break;
+        case 'O2_VALVE_1':
+          onCalibrateValve(1);
+          break;
+        case 'O2_VALVE_2':
+          onCalibrateValve(2);
+          break;
+        case 'HOLOGRAM_DISCOVERY':
+          onCycleHologram();
           break;
         case 'SCOUT_DATA':
           onExtractDataModule();
@@ -356,8 +391,8 @@ export const LunarGameCanvas: React.FC<LunarGameCanvasProps> = ({
       playerRover.updateAntenna(elapsedTime);
       station.update(elapsedTime, delta);
 
-      // Atualiza displays holográficos 3D da cúpula com o estado dos recursos
-      station.updateTerminals(domeInteractionsRef.current, resourcesRef.current);
+      // Atualiza displays holográficos 3D e estações da cúpula com o estado dos recursos e emergências
+      station.updateTerminals(domeInteractionsRef.current, resourcesRef.current, baseInteriorRef.current);
 
       // 3. Atualização de partículas das rodas no vácuo lunar
       wheelDust.update(delta);
@@ -386,14 +421,19 @@ export const LunarGameCanvas: React.FC<LunarGameCanvasProps> = ({
         playerRover.group.quaternion.copy(roverPhysics.orientationQuaternion);
       } else if (currentGameState === 'STATE_DOME_MANAGEMENT') {
         // --- INTERIOR DA BASE EM REALIDADE VIRTUAL / 360° (CÓDIGO DO EDGAR) ---
+        // Trepidação leve da cabine em emergências ativas
+        const isEmergencyActive = baseInteriorRef.current.ledState === 'EMERGENCY';
+        const shakeX = isEmergencyActive ? Math.sin(elapsedTime * 28.0) * 0.018 : 0;
+        const shakeY = isEmergencyActive ? Math.cos(elapsedTime * 34.0) * 0.015 : 0;
+
         // Posição de primeira pessoa no centro de comando da cúpula
-        camera.position.set(0, baseAltitude + 2.3, 0);
+        camera.position.set(shakeX, baseAltitude + 2.3 + shakeY, 0);
 
         // Orientação da cabeça pelo giroscópio (Head-Tracking) ou manual
         const headQuat = vrManager.getHeadOrientation();
         camera.quaternion.copy(headQuat);
 
-        // Foco de olhar Gaze Fuse ativo nos terminais 3D
+        // Foco de olhar Gaze Fuse ativo nos terminais 3D, painéis de decisão e válvulas
         vrManager.updateGaze(delta, station.getInteractiveObjects());
 
         playerRover.group.visible = false;
@@ -544,6 +584,20 @@ export const LunarGameCanvas: React.FC<LunarGameCanvasProps> = ({
       cancelAnimationFrame(animationFrameId);
       soundManager.stopMotor();
       soundManager.stopSonar();
+      vrManager.dispose();
+      scene.traverse((obj) => {
+        const mesh = obj as THREE.Mesh;
+        if (mesh.geometry) {
+          mesh.geometry.dispose();
+        }
+        if (mesh.material) {
+          if (Array.isArray(mesh.material)) {
+            mesh.material.forEach((m) => m.dispose());
+          } else {
+            mesh.material.dispose();
+          }
+        }
+      });
       composer.dispose();
       renderer.dispose();
       if (container && renderer.domElement) {
