@@ -119,9 +119,9 @@ export const LunarGameCanvas: React.FC<LunarGameCanvasProps> = ({
 
     const roverPhysics = new RoverPhysics(terrain, roverInitialPos, 0.78);
 
-    // 9. Rover Perdido (LRO-Scout) aos 2000m (1414.2, y, 1414.2)
-    const targetX = 1414.2;
-    const targetZ = 1414.2;
+    // 9. Rover Perdido (LRO-Scout) balanceado para 650m (460.0, y, 460.0)
+    const targetX = 460.0;
+    const targetZ = 460.0;
     const targetY = terrain.getHeight(targetX, targetZ);
     const lostRover = new LostRover(targetX, targetY, targetZ);
     scene.add(lostRover.group);
@@ -340,7 +340,7 @@ export const LunarGameCanvas: React.FC<LunarGameCanvasProps> = ({
             y: Math.round(roverPhysics.position.y),
             z: Math.round(roverPhysics.position.z)
           },
-          isGpsActive: !isStorm || nav.distanceToTargetM <= 100,
+          isGpsActive: !isStorm || nav.distanceToTargetM <= 60,
           isHeadlightsOn: playerRover.getHeadlightsStatus(),
           isInStorm: isStorm,
           stormChoiceMade: false,

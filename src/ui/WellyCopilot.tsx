@@ -25,7 +25,7 @@ export const WELLY_SEQUENCES: Record<string, Array<{ text: string; mood: WellyMo
   ON_START: [
     { text: 'Saudações, Comandante! Eu sou a Welly, sua copiloto IA.', mood: 'HAPPY' },
     { text: 'Nossa estação transforma o gelo escuro da Lua em água, oxigênio e combustível de foguete.', mood: 'NEUTRAL' },
-    { text: 'O rover LRO-Scout parou de transmitir dados a 2 km daqui. Precisamos resgatá-lo!', mood: 'HAPPY' }
+    { text: 'O rover LRO-Scout parou de transmitir dados a 650 metros daqui. Precisamos resgatá-lo!', mood: 'HAPPY' }
   ],
   ON_DOME_ENTER: [
     { text: 'A energia solar caiu para 60% porque a poeira lunar gruda nos painéis por eletricidade estática.', mood: 'NEUTRAL' },
@@ -33,7 +33,7 @@ export const WELLY_SEQUENCES: Record<string, Array<{ text: string; mood: WellyMo
   ],
   ON_HIGH_SPEED: [
     { text: 'Cuidado com o acelerador! Na Lua o rover pesa 6x menos, mas mantém toda a sua inércia.', mood: 'ALERT', priority: 'URGENT' },
-    { text: 'Reduza para menos de 15 km/h para não perder aderência nas curvas e crateras!', mood: 'ALERT' }
+    { text: 'Mantenha até 22 km/h para preservar a aderência nas curvas e crateras!', mood: 'ALERT' }
   ],
   ON_COLLISION: [
     { text: 'ALERTA DE IMPACTO! Choque contra obstáculo de basalto detectado!', mood: 'ALERT', priority: 'URGENT' },
@@ -41,7 +41,7 @@ export const WELLY_SEQUENCES: Record<string, Array<{ text: string; mood: WellyMo
   ],
   ON_STORM_START: [
     { text: 'ALERTA MÁXIMO! Micrometeoritos levantaram poeira e o sinal GPS foi perdido!', mood: 'ALERT', priority: 'URGENT' },
-    { text: 'Mantenha o rumo 045° Nordeste na bússola e reduza a velocidade para menos de 15 km/h.', mood: 'ALERT' },
+    { text: 'Mantenha o rumo 045° Nordeste na bússola e velocidade segura de até 22 km/h.', mood: 'ALERT' },
     { text: 'Guie-se pelo radar da Base e pelo ritmo do sonar até que o contato seja restabelecido!', mood: 'ALERT' }
   ],
   ON_ROVER_FOUND: [
@@ -339,141 +339,105 @@ export const WellyCopilot: React.FC<WellyCopilotProps> = ({
 
   return (
     <>
-      {/* Botões Flutuantes Permanentes no Topo Direito */}
-      <div className="fixed top-4 right-4 z-40 flex items-center gap-2">
+      {/* Botões Flutuantes Discretos no Topo Direito */}
+      <div className="fixed top-4 right-4 z-40 flex items-center gap-1.5">
         {/* Botão de Controle de Voz da Welly */}
         <button
           onClick={handleToggleVoice}
-          className="flex items-center gap-1.5 px-3 py-2 rounded-full font-mono text-xs font-bold transition-all shadow-lg backdrop-blur-md cursor-pointer border border-cyan-500/40 bg-slate-950/85 hover:bg-slate-900 text-cyan-300"
-          title={isVoiceMuted ? 'Ativar Voz Sintetizada da Welly' : 'Silenciar Voz da Welly'}
+          className="h-8 px-2.5 rounded-full font-mono text-xs font-bold transition-all shadow-md backdrop-blur-md cursor-pointer border border-slate-700 bg-slate-950/80 hover:bg-slate-900 text-slate-300 hover:text-cyan-300 flex items-center gap-1"
+          title={isVoiceMuted ? 'Ativar Voz da Welly' : 'Silenciar Voz da Welly'}
         >
           <span>{isVoiceMuted ? '🔇' : '🔊'}</span>
-          <span className="hidden sm:inline">{isVoiceMuted ? 'VOZ: MUDO' : 'VOZ: ON'}</span>
+          <span className="hidden md:inline text-[10px]">{isVoiceMuted ? 'MUDO' : 'VOZ ON'}</span>
         </button>
 
-        {/* Botão Principal de Chat com Welly */}
+        {/* Botão Discreto de Abertura do Chat com Welly */}
         <button
           onClick={() => {
             setIsChatOpen(!isChatOpen);
             soundManager.playUiBeep(840, 0.06);
           }}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-full font-bold text-sm tracking-wide transition-all shadow-xl backdrop-blur-md cursor-pointer border"
-          style={{
-            backgroundColor: 'rgba(15, 23, 42, 0.92)',
-            borderColor: colors.border,
-            color: '#ffffff',
-            boxShadow: `0 0 16px ${colors.glow}`
-          }}
-          title="Abrir Chat Interativo com a IA Welly"
+          className="h-8 px-3 rounded-full font-mono text-xs font-bold tracking-wide transition-all shadow-md backdrop-blur-md cursor-pointer border border-cyan-500/40 bg-slate-950/85 hover:bg-slate-900 text-cyan-300 flex items-center gap-1.5"
+          title="Abrir Chat com a Copiloto Welly"
         >
-          <span className={`w-2.5 h-2.5 rounded-full ${isSpeaking ? 'animate-bounce bg-emerald-400' : 'animate-ping bg-cyan-400'}`} />
-          <span>CONVERSAR COM WELLY</span>
+          <span className={`w-2 h-2 rounded-full ${isSpeaking ? 'animate-bounce bg-emerald-400' : 'bg-cyan-400 animate-pulse'}`} />
+          <span>💬 Chat</span>
         </button>
       </div>
 
-      {/* Caixa de diálogo da Welly: Instruções sequenciais no canto inferior esquerdo */}
+      {/* Pill / Balão Compacto e Translúcido da Welly na Parte Inferior Central */}
       {currentItem && (
         <div
-          className="fixed bottom-4 left-4 max-w-[360px] sm:max-w-md z-30 p-4 rounded-xl backdrop-blur-lg transition-all animate-fadeIn"
+          className="fixed bottom-4 left-1/2 -translate-x-1/2 z-30 max-w-xl w-[92%] sm:w-auto px-4 py-2 rounded-2xl sm:rounded-full backdrop-blur-md shadow-2xl transition-all animate-fadeIn flex items-center gap-3 border"
           style={{
-            backgroundColor: 'rgba(10, 15, 30, 0.95)',
-            border: `1.5px solid ${colors.border}`,
-            boxShadow: `0 8px 32px rgba(0, 0, 0, 0.85), 0 0 20px ${colors.glow}`
+            backgroundColor: 'rgba(10, 15, 28, 0.82)',
+            borderColor: colors.border,
+            boxShadow: `0 8px 30px rgba(0, 0, 0, 0.85), 0 0 16px ${colors.glow}`
           }}
         >
-          <div className="flex items-start gap-3.5">
-            {/* Avatar SVG expressivo da Welly com animação de fala */}
-            <div
-              className="flex-shrink-0 w-14 h-14 rounded-xl flex items-center justify-center p-2 relative overflow-hidden"
-              style={{
-                backgroundColor: 'rgba(15, 23, 42, 0.95)',
-                border: `2px solid ${colors.border}`,
-                boxShadow: `inset 0 0 12px ${colors.glow}`
+          {/* Avatar / Ícone Compacto com animação de fala */}
+          <div
+            className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center relative overflow-hidden border"
+            style={{
+              backgroundColor: 'rgba(15, 23, 42, 0.95)',
+              borderColor: colors.border
+            }}
+          >
+            <svg viewBox="0 0 100 100" className="w-5 h-5">
+              <circle cx="50" cy="50" r="38" fill="none" stroke={colors.border} strokeWidth="4" />
+              <circle cx="36" cy="45" r="5" fill={colors.eyeColor} className={isSpeaking ? 'animate-bounce' : 'animate-pulse'} />
+              <circle cx="64" cy="45" r="5" fill={colors.eyeColor} className={isSpeaking ? 'animate-bounce' : 'animate-pulse'} />
+              {isSpeaking ? (
+                <path d="M34 68 Q50 60 66 68" stroke={colors.eyeColor} strokeWidth="4" fill="none" />
+              ) : (
+                <line x1="34" y1="66" x2="66" y2="66" stroke={colors.eyeColor} strokeWidth="3" strokeLinecap="round" />
+              )}
+            </svg>
+          </div>
+
+          {/* Texto do diálogo e autor */}
+          <div className="flex-1 min-w-0 font-mono">
+            <div className="flex items-center gap-2 mb-0.5">
+              <span className="font-extrabold text-[10px] tracking-wider text-cyan-400">
+                WELLY
+              </span>
+              <span
+                className="text-[9px] font-bold px-1.5 py-0.2 rounded-full uppercase"
+                style={{ backgroundColor: colors.badge, color: colors.badgeText }}
+              >
+                {currentMood}
+              </span>
+              {queue.length > 0 && (
+                <span className="text-[9px] text-slate-400">
+                  +{queue.length}
+                </span>
+              )}
+            </div>
+            <p className="text-gray-100 text-xs sm:text-sm leading-snug line-clamp-2">
+              {displayedText}
+              {isTyping && <span className="animate-pulse inline-block w-1.5 h-3 ml-0.5 bg-cyan-400 align-middle" />}
+            </p>
+          </div>
+
+          {/* Botões de Ação: Chat Histórico & Avançar */}
+          <div className="flex-shrink-0 flex items-center gap-1.5 font-mono">
+            <button
+              onClick={() => {
+                setIsChatOpen(true);
+                soundManager.playUiBeep(840, 0.05);
               }}
+              className="px-2 py-1 rounded-lg bg-slate-900/80 hover:bg-slate-800 border border-slate-700 text-[10px] text-slate-300 hover:text-cyan-300 transition-colors cursor-pointer"
+              title="Abrir Histórico do Chat"
             >
-              <svg viewBox="0 0 100 100" className="w-full h-full">
-                {/* Antenas estilizadas da folha de Welwitschia */}
-                <path
-                  d="M50 20 C35 5 15 25 30 45 C40 35 48 30 50 35 C52 30 60 35 70 45 C85 25 65 5 50 20 Z"
-                  fill="none"
-                  stroke={colors.border}
-                  strokeWidth="4"
-                  strokeLinecap="round"
-                />
-                <rect x="22" y="42" width="56" height="38" rx="10" fill="#0f172a" stroke={colors.border} strokeWidth="3" />
-                {currentMood === 'ALERT' ? (
-                  <g fill={colors.eyeColor}>
-                    <polygon points="32,54 44,54 38,68" />
-                    <polygon points="56,54 68,54 62,68" />
-                  </g>
-                ) : currentMood === 'HAPPY' ? (
-                  <g stroke={colors.eyeColor} strokeWidth="4" fill="none" strokeLinecap="round">
-                    <path d="M30 62 Q38 52 46 62" />
-                    <path d="M54 62 Q62 52 70 62" />
-                  </g>
-                ) : (
-                  <g fill={colors.eyeColor}>
-                    <circle cx="38" cy="61" r="5" className={isSpeaking ? 'animate-bounce' : 'animate-pulse'} />
-                    <circle cx="62" cy="61" r="5" className={isSpeaking ? 'animate-bounce' : 'animate-pulse'} />
-                    {/* Linha de ondas sonoras no lugar da boca quando falando */}
-                    {isSpeaking ? (
-                      <path
-                        d="M32 72 Q42 66 50 72 T68 72"
-                        stroke={colors.eyeColor}
-                        strokeWidth="3"
-                        fill="none"
-                        className="animate-pulse"
-                      />
-                    ) : (
-                      <line x1="28" y1="72" x2="72" y2="72" stroke={colors.eyeColor} strokeWidth="2" strokeDasharray="4 2" />
-                    )}
-                  </g>
-                )}
-              </svg>
-            </div>
-
-            {/* Texto da instrução (Frase curta e objetiva) */}
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center justify-between mb-1">
-                <div className="flex items-center gap-2">
-                  <span className="font-extrabold text-xs tracking-wider text-cyan-400">
-                    WELLY // COPILOTO IA
-                  </span>
-                  <span
-                    className="text-[10px] font-bold px-1.5 py-0.2 rounded-full uppercase"
-                    style={{ backgroundColor: colors.badge, color: colors.badgeText }}
-                  >
-                    {currentMood}
-                  </span>
-                </div>
-                {queue.length > 0 && (
-                  <span className="text-[10px] font-mono text-slate-400">
-                    +{queue.length}
-                  </span>
-                )}
-              </div>
-
-              <p className="text-gray-100 text-sm leading-snug font-mono min-h-[2.4rem]">
-                {displayedText}
-                {isTyping && <span className="animate-pulse inline-block w-1.5 h-3.5 ml-1 bg-cyan-400 align-middle" />}
-              </p>
-
-              {/* Barra de controle inferior */}
-              <div className="mt-2.5 flex items-center justify-between border-t border-slate-800/80 pt-2">
-                <button
-                  onClick={handleToggleVoice}
-                  className="text-[10px] text-slate-400 hover:text-cyan-300 font-mono flex items-center gap-1 cursor-pointer"
-                >
-                  <span>{isVoiceMuted ? '🔇 Desmutar voz' : '🔊 Voz ativa'}</span>
-                </button>
-                <button
-                  onClick={advanceToNext}
-                  className="px-2.5 py-1 rounded bg-cyan-950/70 hover:bg-cyan-900 border border-cyan-500/50 text-[11px] font-mono font-bold text-cyan-300 hover:text-white transition-all cursor-pointer flex items-center gap-1"
-                >
-                  <span>{queue.length > 0 ? 'Continuar ▸' : 'Fechar ✕'}</span>
-                </button>
-              </div>
-            </div>
+              💬 Chat
+            </button>
+            <button
+              onClick={advanceToNext}
+              className="px-2 py-1 rounded-lg bg-cyan-950/80 hover:bg-cyan-900 border border-cyan-500/50 text-[10px] font-bold text-cyan-300 hover:text-white transition-all cursor-pointer"
+              title={queue.length > 0 ? 'Próxima instrução' : 'Fechar'}
+            >
+              {queue.length > 0 ? '▸' : '✕'}
+            </button>
           </div>
         </div>
       )}

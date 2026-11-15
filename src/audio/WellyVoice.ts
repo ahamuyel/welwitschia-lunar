@@ -1,12 +1,16 @@
 /**
  * Welwitschia Lunar - Motor de Voz Sintetizada da Welly (Web Speech API)
- * Síntese de voz em português (pt-BR / pt-PT) nativa, sem dependência de rede,
- * com sincronização de fala com o avatar, controle de volume/mudo e pitch natural de IA.
+ * Síntese rigorosa em português (pt-BR / pt-PT) nativo, sem sotaque estrangeiro.
+ * Fallback seguro: se o navegador/SO não possuir voz em português, NÃO fala em inglês;
+ * emite efeito sonoro sutil de transmissão de rádio espacial.
  */
+
+import { soundManager } from './SoundManager';
 
 class WellyVoice {
   private synth: SpeechSynthesis | null = null;
   private selectedVoice: SpeechSynthesisVoice | null = null;
+  private hasPtVoice: boolean = false;
   private isMuted: boolean = false; // Ativada por padrão conforme diretriz do GDD
   private isSpeaking: boolean = false;
   private listeners: Array<(isSpeaking: boolean) => void> = [];
@@ -40,16 +44,32 @@ class WellyVoice {
     const voices = this.synth.getVoices();
     if (!voices || voices.length === 0) return;
 
-    // Prioriza vozes em português brasileiras e femininas/naturais
-    const ptVoices = voices.filter(v => v.lang.startsWith('pt'));
+    // 1. Filtro rigoroso: apenas vozes cujo idioma comece explicitamente com 'pt' (pt-PT ou pt-BR)
+    const ptVoices = voices.filter(v => v.lang.toLowerCase().startsWith('pt'));
 
-    const preferredVoice =
-      ptVoices.find(v => v.name.includes('Google') || v.name.includes('Luciana') || v.name.includes('Maria') || v.name.includes('Natural')) ||
-      ptVoices.find(v => v.lang === 'pt-BR') ||
-      ptVoices[0] ||
-      voices[0];
+    if (ptVoices.length > 0) {
+      this.hasPtVoice = true;
 
-    this.selectedVoice = preferredVoice || null;
+      // 2. Prioridade para vozes naturais/neurais e amigáveis em português
+      const preferredKeywords = [
+        'natural', 'neural', 'google português', 'maria', 'francisca',
+        'joana', 'luciana', 'cristiano', 'inês', 'ines', 'raquel', 'letícia', 'helena'
+      ];
+
+      const bestVoice =
+        ptVoices.find(v => preferredKeywords.some(kw => v.name.toLowerCase().includes(kw))) ||
+        ptVoices.find(v => v.lang.toLowerCase() === 'pt-pt') ||
+        ptVoices.find(v => v.lang.toLowerCase() === 'pt-br') ||
+        ptVoices[0];
+
+      this.selectedVoice = bestVoice || null;
+    } else {
+      // 3. NENHUMA voz em português disponível no sistema do usuário:
+      // NUNCA utilizar voz em inglês ou outro idioma para ler texto em português!
+      this.hasPtVoice = false;
+      this.selectedVoice = null;
+    }
+
     this.isInitialized = true;
   }
 
@@ -67,10 +87,11 @@ class WellyVoice {
   }
 
   /**
-   * Fala a frase fornecida cancelando qualquer fala anterior para evitar sobreposição
+   * Fala a frase fornecida cancelando qualquer fala anterior.
+   * Se não houver voz portuguesa instalada no sistema, executa fallback sonoro espacial.
    */
   public speak(text: string): void {
-    if (!this.synth || this.isMuted) return;
+    if (this.isMuted) return;
 
     // Remove tags markdown/emojis para síntese limpa
     const cleanText = text
@@ -80,17 +101,25 @@ class WellyVoice {
 
     if (!cleanText) return;
 
+    // Fallback Seguro: sem voz portuguesa, desativa TTS e emite rádio bip espacial
+    if (!this.synth || !this.hasPtVoice || !this.selectedVoice) {
+      soundManager.playUiBeep(980, 0.08);
+      // Anima brevemente o avatar para simular transmissão de rádio
+      this.setSpeakingState(true);
+      setTimeout(() => {
+        this.setSpeakingState(false);
+      }, 1200);
+      return;
+    }
+
     try {
       this.synth.cancel(); // Interrompe fala anterior
 
       const utterance = new SpeechSynthesisUtterance(cleanText);
-
-      if (this.selectedVoice) {
-        utterance.voice = this.selectedVoice;
-      }
-      utterance.lang = this.selectedVoice?.lang || 'pt-BR';
-      utterance.pitch = 1.08; // Tom ligeiramente agudo e amigável de IA
-      utterance.rate = 1.05;  // Velocidade dinâmica e fluida
+      utterance.voice = this.selectedVoice;
+      utterance.lang = this.selectedVoice.lang || 'pt-PT';
+      utterance.pitch = 1.06; // Tom agradável e científico de copiloto espacial
+      utterance.rate = 1.05;  // Ritmo dinâmico
       utterance.volume = 1.0;
 
       utterance.onstart = () => {
@@ -102,7 +131,6 @@ class WellyVoice {
       };
 
       utterance.onerror = (e) => {
-        // Ignora erro de interrupção intencional (cancel)
         if (e.error !== 'interrupted' && e.error !== 'canceled') {
           console.warn('WellyVoice erro de síntese:', e.error);
         }
@@ -148,6 +176,10 @@ class WellyVoice {
 
   public getIsInitialized(): boolean {
     return this.isInitialized;
+  }
+
+  public getHasPtVoice(): boolean {
+    return this.hasPtVoice;
   }
 }
 

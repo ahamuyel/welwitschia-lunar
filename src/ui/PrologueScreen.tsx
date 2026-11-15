@@ -59,7 +59,7 @@ export const PrologueScreen: React.FC<PrologueScreenProps> = ({ onStartMission }
         <p className="text-sm md:text-base text-slate-300 leading-relaxed font-sans max-w-xl mx-auto">
           Você é o Comandante da Estação Welwitschia no Polo Sul da Lua. 
           O rover robótico explorador <strong className="text-cyan-300">LRO-Scout</strong> parou de transmitir dados 
-          a 2.000 metros de distância. Prepare a base, faça o briefing de saída veicular e conduza o rover tripulado 
+          a 650 metros de distância. Prepare a base, faça o briefing de saída veicular e conduza o rover tripulado 
           através do terreno lunar para recuperar os dados científicos essenciais para a refinaria de combustível!
         </p>
 

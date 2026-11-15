@@ -31,15 +31,15 @@ export class GameStateManager {
 
   public cameraMode: CameraViewMode = 'THIRD_PERSON';
 
-  // Alvo do Rover Perdido LRO-Scout (2000m a 045° NE)
-  public readonly targetCoordinates = { x: 1414.2, y: 0, z: 1414.2 };
-  public readonly targetDistanceM: number = 2000;
+  // Alvo do Rover Perdido LRO-Scout (650m a 045° NE - 460m, 460m)
+  public readonly targetCoordinates = { x: 460.0, y: 0, z: 460.0 };
+  public readonly targetDistanceM: number = 650;
 
   // Estado da tempestade de micrometeoritos
   public stormDilemmaTriggered: boolean = false;
   public stormChoiceMade: boolean = false;
   public stormModeInstrumentAdvancing: boolean = false;
-  public stormClearedAt100m: boolean = false;
+  public stormClearedAt60m: boolean = false;
 
   // Resgate concluído
   public dataModuleExtracted: boolean = false;
@@ -134,14 +134,14 @@ export class GameStateManager {
       return { emergencyRescue: false };
     }
 
-    // 1. Oxigênio do traje: -0.12% / s fora da base (autonomia ~13.8 minutos)
-    const suitOxygenDrain = 0.12 * delta;
+    // 1. Oxigênio do traje: -0.04% / s fora da base (autonomia generosa de ~41.6 minutos)
+    const suitOxygenDrain = 0.04 * delta;
     this.resources.suitOxygen = Math.max(0, this.resources.suitOxygen - suitOxygenDrain);
 
-    // 2. Bateria do rover: -(0.04% + speed * 0.008%) / s + (0.02% / s com faróis)
-    let batteryDrain = (0.04 + (speedKmh * 0.008)) * delta;
+    // 2. Bateria do rover: -(0.015% + speed * 0.003%) / s + (0.008% / s com faróis)
+    let batteryDrain = (0.015 + (speedKmh * 0.003)) * delta;
     if (isHeadlightsOn) {
-      batteryDrain += 0.02 * delta;
+      batteryDrain += 0.008 * delta;
     }
     this.resources.roverBattery = Math.max(0, this.resources.roverBattery - batteryDrain);
 
@@ -184,7 +184,7 @@ export class GameStateManager {
   // --- DILEMA DA TEMPESTADE (ESTADO 4) ---
 
   public checkStormDistance(distance: number): void {
-    if (distance <= 500 && !this.stormDilemmaTriggered && this.currentState === 'STATE_ROVER_EXPLORATION') {
+    if (distance <= 220 && !this.stormDilemmaTriggered && this.currentState === 'STATE_ROVER_EXPLORATION') {
       this.stormDilemmaTriggered = true;
       this.setState('STATE_STORM_DILEMMA');
       soundManager.startSonar(distance);
@@ -193,9 +193,9 @@ export class GameStateManager {
     if (this.currentState === 'STATE_STORM_DILEMMA' && this.stormModeInstrumentAdvancing) {
       soundManager.updateSonarDistance(distance);
 
-      // Ao chegar a 100m, a poeira assenta e o GPS retorna
-      if (distance <= 100 && !this.stormClearedAt100m) {
-        this.stormClearedAt100m = true;
+      // Ao chegar a 60m do alvo, a poeira assenta e o GPS retorna
+      if (distance <= 60 && !this.stormClearedAt60m) {
+        this.stormClearedAt60m = true;
         soundManager.stopSonar();
         soundManager.playSuccessChime();
       }
@@ -282,7 +282,7 @@ export class GameStateManager {
     this.stormDilemmaTriggered = false;
     this.stormChoiceMade = false;
     this.stormModeInstrumentAdvancing = false;
-    this.stormClearedAt100m = false;
+    this.stormClearedAt60m = false;
     this.dataModuleExtracted = false;
     soundManager.stopMotor();
     soundManager.stopSonar();

@@ -24,7 +24,7 @@ export function App() {
   const [telemetry, setTelemetry] = useState<TelemetryData>({
     speedKmh: 0,
     headingDeg: 45,
-    distanceToTargetM: 2000,
+    distanceToTargetM: 650,
     azimuthToTargetDeg: 45,
     distanceToBaseM: 0,
     azimuthToBaseDeg: 180,

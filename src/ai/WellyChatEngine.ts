@@ -166,7 +166,7 @@ Dados atuais da telemetria da missão para você usar em suas respostas:
       const o2 = Math.round(resources.suitOxygen);
       if (o2 > 60) {
         return {
-          text: `Os tanques do seu traje estão com ${o2}% de O₂. O consumo é constante em 0.12% por segundo fora da cúpula, garantindo boa margem de exploração.`,
+          text: `Os tanques do seu traje estão com ${o2}% de O₂. O consumo é super eficiente em 0.04% por segundo fora da cúpula, garantindo mais de 40 minutos de autonomia.`,
           mood: 'HAPPY'
         };
       } else if (o2 > 25) {

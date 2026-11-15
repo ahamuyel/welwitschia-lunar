@@ -226,10 +226,10 @@ export const DomeManagementScreen: React.FC<DomeManagementScreenProps> = ({
               </div>
               <div className="flex justify-between p-2.5 rounded bg-slate-900 border border-slate-800">
                 <span className="text-slate-400">ALVO (LRO-SCOUT):</span>
-                <span className="text-emerald-400 font-bold">2.000m NE (Azimute 045°)</span>
+                <span className="text-emerald-400 font-bold">650m NE (Azimute 045°)</span>
               </div>
               <div className="p-3 rounded bg-rose-950/40 border border-rose-500/40 text-rose-300 text-xs leading-relaxed">
-                <strong>⚠ ALERTA DE RISCO:</strong> Micrometeoritos e nuvens balísticas de regolito eletrostático foram detectados a 500m do alvo. Evite exceder 15 km/h em áreas de baixa visibilidade!
+                <strong>⚠ ALERTA DE RISCO:</strong> Micrometeoritos e nuvens balísticas de regolito eletrostático foram detectados a 220m do alvo. Mantenha velocidade segura de até 22 km/h!
               </div>
             </div>
 

@@ -34,8 +34,8 @@ export class RoverPhysics {
 
   // Parâmetros de física lunar
   public readonly lunarGravity: number = -1.62; // m/s² (1/6 da Terra)
-  public readonly maxSpeedKmh: number = 28.0;
-  public readonly maxSpeedMs: number = 28.0 / 3.6; // ~7.78 m/s
+  public readonly maxSpeedKmh: number = 32.0;
+  public readonly maxSpeedMs: number = 32.0 / 3.6; // ~8.89 m/s
   public readonly roverColliderRadius: number = 1.65; // Raio de colisão do chassi
 
   // Estado cinemático
@@ -81,10 +81,10 @@ export class RoverPhysics {
     let accel = 0;
     if (this.isGrounded) {
       if (inputs.forward) {
-        accel += 3.8;
+        accel += 4.6;
       }
       if (inputs.backward) {
-        accel -= 2.6;
+        accel -= 3.0;
       }
       if (inputs.brake) {
         const brakeDecel = 6.5;
@@ -96,22 +96,22 @@ export class RoverPhysics {
       }
     }
 
-    // 2. Zona de Velocidade e Atrito Lateral
+    // 2. Zona de Velocidade e Atrito Lateral (Segura até 22 km/h, Alerta > 26 km/h)
     this.currentSpeedKmh = Math.abs(forwardSpeed) * 3.6;
 
     let lateralGrip = 1.0;
-    if (this.currentSpeedKmh > 20.0) {
-      lateralGrip = 0.60;
+    if (this.currentSpeedKmh > 26.0) {
+      lateralGrip = 0.65;
       this.highSpeedDuration += dt;
-      if (this.highSpeedDuration >= 3.0) {
+      if (this.highSpeedDuration >= 2.5) {
         triggeredHighSpeedAlert = true;
       }
     } else {
       this.highSpeedDuration = Math.max(0, this.highSpeedDuration - dt * 2.0);
     }
 
-    // Na tempestade: se correr acima de 18 km/h, risco de micrometeoritos e choque de ejetos
-    if (isInStormDilemma && this.currentSpeedKmh > 18.0) {
+    // Na tempestade: se correr acima de 24 km/h, risco de micrometeoritos e choque de ejetos
+    if (isInStormDilemma && this.currentSpeedKmh > 24.0) {
       if (Math.random() < 0.035) {
         sufferedRockDamage = true;
       }

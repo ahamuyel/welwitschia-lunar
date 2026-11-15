@@ -1,6 +1,6 @@
 /**
  * Welwitschia Lunar - Rover Perdido (LRO-Scout)
- * Posicionado inclinado a 18° na borda de uma cratera de impacto a 2.000m da base (azimute 045° NE).
+ * Posicionado inclinado a 18° na borda de uma cratera de impacto a 650m da base (azimute 045° NE).
  * Carenagem em folha dourada MLI degradada, painéis solares cobertos por regolito espesso,
  * braço robótico de coleta de gelo desativado e LED de emergência âmbar pulsante.
  */
