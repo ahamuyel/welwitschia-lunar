@@ -18,6 +18,8 @@ interface DomeManagementScreenProps {
   onToggleVR: () => void;
   isRadarVisible: boolean;
   onToggleRadar: () => void;
+  isChatOpen: boolean;
+  onToggleChat: () => void;
   onRedirectEnergy: () => void;
   onRefillSuitOxygen: () => void;
   onViewBriefing: () => void;
@@ -38,6 +40,8 @@ export const DomeManagementScreen: React.FC<DomeManagementScreenProps> = ({
   onToggleVR,
   isRadarVisible,
   onToggleRadar,
+  isChatOpen,
+  onToggleChat,
   onRedirectEnergy,
   onRefillSuitOxygen,
   onViewBriefing,
@@ -92,6 +96,8 @@ export const DomeManagementScreen: React.FC<DomeManagementScreenProps> = ({
     if (activeEm?.type === 'LUNAR_NIGHT_COLD') icon = choice === 'A' ? '🔥' : '❄️';
     if (activeEm?.type === 'ELECTROSTATIC_DUST') icon = choice === 'A' ? '⚡' : '🧑‍🚀';
     if (activeEm?.type === 'OXYGEN_LEAK') icon = choice === 'A' ? '🔧' : '👁️';
+    if (activeEm?.type === 'FUEL_CELL_OVERLOAD') icon = choice === 'A' ? '🌡️' : '🔬';
+    if (activeEm?.type === 'GREENHOUSE_DEHYDRATION') icon = choice === 'A' ? '💧' : '🌱';
 
     return { icon, title, effect };
   };
@@ -153,7 +159,7 @@ export const DomeManagementScreen: React.FC<DomeManagementScreenProps> = ({
           <button
             type="button"
             onClick={onToggleRadar}
-            className={`pointer-events-auto min-h-[44px] min-w-[44px] px-3 rounded-full text-xs font-bold backdrop-blur-md border transition-all flex items-center justify-center cursor-pointer ${
+            className={`pointer-events-auto min-h-[44px] min-w-[44px] px-2.5 rounded-full text-xs font-bold backdrop-blur-md border transition-all flex items-center justify-center cursor-pointer ${
               isRadarVisible
                 ? 'bg-emerald-500/25 border-emerald-400/70 text-emerald-200'
                 : 'bg-slate-950/70 border-white/15 text-slate-100'
@@ -161,6 +167,19 @@ export const DomeManagementScreen: React.FC<DomeManagementScreenProps> = ({
             title="Mostrar / Ocultar Radar Lunar"
           >
             🧭 Radar
+          </button>
+
+          <button
+            type="button"
+            onClick={onToggleChat}
+            className={`pointer-events-auto min-h-[44px] min-w-[44px] px-2.5 rounded-full text-xs font-bold backdrop-blur-md border transition-all flex items-center justify-center cursor-pointer ${
+              isChatOpen
+                ? 'bg-cyan-500/25 border-cyan-400/70 text-cyan-200'
+                : 'bg-slate-950/70 border-white/15 text-slate-100'
+            }`}
+            title="Abrir / Fechar Chat com IA Welly"
+          >
+            🤖 Welly
           </button>
 
           <button
@@ -289,10 +308,10 @@ export const DomeManagementScreen: React.FC<DomeManagementScreenProps> = ({
               </div>
             </div>
 
-            {/* Simulador de Emergências Táticas */}
+            {/* Simulador de Emergências Táticas (Motor Autónomo NASA ativo a cada 22s-45s) */}
             <div className="space-y-1.5 pt-1 border-t border-white/10">
               <span className="block text-[10px] font-bold text-slate-400 uppercase">
-                Simular Problema Tático (A vs B)
+                Catálogo NASA (6 Eventos Autónomos + Teste)
               </span>
               <div className="grid grid-cols-2 gap-2">
                 <button
@@ -300,36 +319,54 @@ export const DomeManagementScreen: React.FC<DomeManagementScreenProps> = ({
                   onClick={() => {
                     onTriggerEmergency('SOLAR_STORM');
                   }}
-                  className="min-h-[44px] px-2.5 rounded-xl bg-amber-500/15 border border-amber-400/40 text-amber-200 font-semibold cursor-pointer"
+                  className="min-h-[40px] px-2 rounded-xl bg-amber-500/15 border border-amber-400/40 text-amber-200 font-semibold cursor-pointer"
                 >
-                  ☀️ Tempestade
+                  ☀️ Partículas SPE
                 </button>
                 <button
                   type="button"
                   onClick={() => {
                     onTriggerEmergency('LUNAR_NIGHT_COLD');
                   }}
-                  className="min-h-[44px] px-2.5 rounded-xl bg-sky-500/15 border border-sky-400/40 text-sky-200 font-semibold cursor-pointer"
+                  className="min-h-[40px] px-2 rounded-xl bg-sky-500/15 border border-sky-400/40 text-sky-200 font-semibold cursor-pointer"
                 >
-                  ❄️ Noite Lunar
+                  ❄️ Noite -173°C
                 </button>
                 <button
                   type="button"
                   onClick={() => {
                     onTriggerEmergency('ELECTROSTATIC_DUST');
                   }}
-                  className="min-h-[44px] px-2.5 rounded-xl bg-yellow-500/15 border border-yellow-400/40 text-yellow-200 font-semibold cursor-pointer"
+                  className="min-h-[40px] px-2 rounded-xl bg-yellow-500/15 border border-yellow-400/40 text-yellow-200 font-semibold cursor-pointer"
                 >
-                  🌫️ Poeira Solar
+                  🌫️ Poeira EDS
                 </button>
                 <button
                   type="button"
                   onClick={() => {
                     onTriggerEmergency('OXYGEN_LEAK');
                   }}
-                  className="min-h-[44px] px-2.5 rounded-xl bg-red-500/15 border border-red-400/40 text-red-200 font-semibold cursor-pointer"
+                  className="min-h-[40px] px-2 rounded-xl bg-red-500/15 border border-red-400/40 text-red-200 font-semibold cursor-pointer"
                 >
-                  💨 Fuga O₂
+                  💨 Fuga 10⁻¹² torr
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onTriggerEmergency('FUEL_CELL_OVERLOAD');
+                  }}
+                  className="min-h-[40px] px-2 rounded-xl bg-orange-500/15 border border-orange-400/40 text-orange-200 font-semibold cursor-pointer"
+                >
+                  🌡️ Pico +127°C
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onTriggerEmergency('GREENHOUSE_DEHYDRATION');
+                  }}
+                  className="min-h-[40px] px-2 rounded-xl bg-emerald-500/15 border border-emerald-400/40 text-emerald-200 font-semibold cursor-pointer"
+                >
+                  💧 Seca ISRU
                 </button>
               </div>
             </div>

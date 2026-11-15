@@ -24,70 +24,104 @@ export type BaseInteriorChangeCallback = (interior: BaseInteriorState) => void;
 export const BASE_EMERGENCY_CATALOG: Record<BaseEmergencyType, BaseEmergencyEvent> = {
   SOLAR_STORM: {
     type: 'SOLAR_STORM',
-    title: 'TEMPESTADE SOLAR // EJEÇÃO CORONAL',
+    title: 'TEMPESTADE DE PARTÍCULAS SOLARES (SPE)',
     stationId: 'SHIELD',
-    stationName: 'Estação de Blindagem Solar',
+    stationName: 'Estação de Blindagem Solar & Térmica',
     description:
-      'Partículas solares de alta energia aproximam-se do Polo Sul Lunar! Sem atmosfera na Lua, precisamos de decidir como proteger a cabine.',
+      'Sem campo magnético global nem atmosfera densa na Lua, uma ejeção solar de protões (SPE) atinge o Polo Sul! Como proteger a tripulação?',
     ledState: 'EMERGENCY',
     optionA: {
-      label: '[A] Escudo Máximo (-25% Bateria, 0 Dano)',
-      costText: 'Ativa bobinas Kapton no máximo: -25% Energia, 0% Dano'
+      label: '[A] Ativar Escudo Eletromagnético (-25% Bateria, 0 Dano)',
+      costText: 'Bobinas Kapton no máximo: -25% Bateria, 0% Dano'
     },
     optionB: {
-      label: '[B] Modo Abrigo (Desliga Lab/Estufa temp., poupa bateria)',
-      costText: 'Pausa Estufa e Lab temporariamente, poupa bateria (-5%)'
+      label: '[B] Modo Abrigo no Núcleo (Pausa Lab/Estufa 15s, poupa bateria)',
+      costText: 'Pausa Lab e Estufa por 15s, poupa bateria (-5%)'
     }
   },
   LUNAR_NIGHT_COLD: {
     type: 'LUNAR_NIGHT_COLD',
-    title: 'NOITE LUNAR // QUEDA TÉRMICA (-180°C)',
+    title: 'NOITE LUNAR // CRATERA SOMBREADA (-173°C)',
     stationId: 'GREENHOUSE',
     stationName: 'Estufa Interior Welwitschia',
     description:
-      'A sombra da cratera Shackleton fez a temperatura cair drasticamente! Geada começa a formar-se nas janelas e ameaça a Welwitschia mirabilis.',
+      'A sombra da cratera Shackleton fez a temperatura externa cair para -173°C (dados NASA LRO)! O frio extremo ameaça congelar a hidroponia.',
     ledState: 'HYPOTHERMIA',
     optionA: {
-      label: '[A] Aquecimento Total (Consome +Bateria, mantém +20°C)',
-      costText: 'Consome -20% Energia Solar, mantém +21°C e plantas vibrantes'
+      label: '[A] Aquecimento Total da Cabine (-20% Bateria, mantém +21°C)',
+      costText: 'Consome -20% Bateria, mantém +21°C e plantas vibrantes'
     },
     optionB: {
-      label: '[B] Isolar Laboratório (Poupa energia, pausa ciência)',
-      costText: 'Poupa energia (-5%), reduz temp. p/ +11°C e pausa Lab'
+      label: '[B] Isolar Setores Secundários (Mantém Estufa/O₂, pausa ciência)',
+      costText: 'Mantém calor na Estufa e O₂, pausa Lab por 15s (-5% Bateria)'
     }
   },
   ELECTROSTATIC_DUST: {
     type: 'ELECTROSTATIC_DUST',
-    title: 'POEIRA NOS PAINÉIS // REGOLITO ELETROSTÁTICO',
+    title: 'TEMPESTADE ELETROSTÁTICA DE REGOLITO',
     stationId: 'ENERGY',
     stationName: 'Estação de Blindagem & Energia',
     description:
-      'Poeira lunar carregada eletricamente pelo vento solar cobriu os painéis fotovoltaicos, reduzindo a captação de energia em 40%.',
+      'Poeira lunar abrasiva carregada eletricamente pelos raios UV solares aderiu aos painéis fotovoltaicos, reduzindo a energia!',
     ledState: 'ALERT',
     optionA: {
-      label: '[A] Pulso Eletrostático (-15% Bateria, limpa já)',
-      costText: 'Dispara cortina dielétrica: -15% Bateria, Solar vai a 100%'
+      label: '[A] Pulso Eletrostático EDS (-15% Bateria, limpa na hora)',
+      costText: 'Escudo Eletrodinâmico NASA (EDS): -15% Bateria, limpa já'
     },
     optionB: {
-      label: '[B] Limpeza Manual no Exterior (0 Bateria, gasta mais O2)',
-      costText: '0% custo de Bateria, consome -15% Oxigénio na limpeza EVA'
+      label: '[B] Sair em EVA para Limpeza Manual (0 Bateria, consome O₂)',
+      costText: '0% Bateria, consome -15% Oxigénio do fato em EVA'
     }
   },
   OXYGEN_LEAK: {
     type: 'OXYGEN_LEAK',
-    title: 'FUGA DE OXIGÉNIO // MICROFISSURA NA JUNTA',
+    title: 'MICRO-METEORITO // FUGA DE PRESSÃO (10⁻¹² torr)',
     stationId: 'OXYGEN',
     stationName: 'Estação de Suporte de Vida (O₂)',
     description:
-      'Um micrometeorito causou perda de pressão numa conduta primária de O₂! Escolhe entre vedação química rápida ou calibração manual das 2 válvulas.',
+      'Um micrometeorito atingiu uma conduta primária perante o vácuo lunar (exosfera de 10⁻¹² torr)! Estanca a fuga de pressão imediatamente.',
     ledState: 'EMERGENCY',
     optionA: {
-      label: '[A] Selagem Rápida (-10% Integridade)',
-      costText: 'Estanca já com espuma polimérica, mas reduz -10% Integridade'
+      label: '[A] Espuma Selante Polimérica (-10% Integridade Estrutural)',
+      costText: 'Veda na hora com polímero, reduz -10% Integridade'
     },
     optionB: {
-      label: '[B] Calibrar Válvulas (Olhar para 2 válvulas em 12s, sem custo)',
+      label: '[B] Redirecionar Válvulas de Reserva (Ativar 2 válvulas em 12s)',
       costText: 'Olha/toca nas 2 válvulas em 12s: 0 custo e +10% O₂'
+    }
+  },
+  FUEL_CELL_OVERLOAD: {
+    type: 'FUEL_CELL_OVERLOAD',
+    title: 'SOBRECARGA NAS CÉLULAS DE COMBUSTÍVEL (+127°C)',
+    stationId: 'ENERGY',
+    stationName: 'Estação de Blindagem Solar & Térmica',
+    description:
+      'Durante o pico solar lunar (+127°C), as células regenerativas sofreram uma sobrecarga térmica! Precisamos de dissipar ou desviar o excesso.',
+    ledState: 'ALERT',
+    optionA: {
+      label: '[A] Dissipar Calor nos Radiadores (Pausa Estufa por 10s)',
+      costText: 'Abre radiadores externos: pausa Estufa 10s, 0% dano'
+    },
+    optionB: {
+      label: '[B] Armazenar Excesso no Laboratório (+12 Ciência, -10% Integridade)',
+      costText: 'Gera +12 Ciência, mas o calor reduz -10% Integridade'
+    }
+  },
+  GREENHOUSE_DEHYDRATION: {
+    type: 'GREENHOUSE_DEHYDRATION',
+    title: 'DESIDRATAÇÃO NA ESTUFA WELWITSCHIA (ISRU)',
+    stationId: 'GREENHOUSE',
+    stationName: 'Estufa Interior Welwitschia',
+    description:
+      'A reserva de água reciclada (ISRU) baixou na bancada hidropónica! Mesmo resistente como no Deserto do Namibe, a Welwitschia precisa de humidade.',
+    ledState: 'ALERT',
+    optionA: {
+      label: '[A] Transferir Água do Suporte de Vida (-12% O₂, salva colheita)',
+      costText: 'Desvia H₂O da eletrólise (-12% O₂), mantém plantas 100%'
+    },
+    optionB: {
+      label: '[B] Modo Dormência da Welwitschia (Pausa por 15s, 0 custo)',
+      costText: 'Ativa adaptação do Namibe: pausa Estufa 15s, 0 custo'
     }
   }
 };
@@ -129,8 +163,12 @@ export class GameStateManager {
       valve1Calibrated: false,
       valve2Calibrated: false
     },
+    sectorPauseTimerSec: 0,
+    nextAutonomousEventSec: 26,
     lastConsequenceFeedback: null
   };
+
+  private lastEmergencyType: BaseEmergencyType | null = null;
 
   public cameraMode: CameraViewMode = 'THIRD_PERSON';
 
@@ -207,8 +245,10 @@ export class GameStateManager {
 
   public triggerBaseEmergency(type: BaseEmergencyType): void {
     const emergency = BASE_EMERGENCY_CATALOG[type];
+    this.lastEmergencyType = type;
     this.baseInterior.activeEmergency = emergency;
     this.baseInterior.ledState = emergency.ledState;
+    this.baseInterior.nextAutonomousEventSec = 22 + Math.random() * 23;
     this.baseInterior.valveCalibration = {
       active: false,
       timeRemainingSec: 12,
@@ -229,6 +269,12 @@ export class GameStateManager {
       this.notifyResources();
     } else if (type === 'OXYGEN_LEAK') {
       soundManager.playOxygenHissSound();
+    } else if (type === 'FUEL_CELL_OVERLOAD') {
+      this.baseInterior.cabinTempC = 32;
+      soundManager.playAlertSiren();
+    } else if (type === 'GREENHOUSE_DEHYDRATION') {
+      this.baseInterior.greenhouseHealthy = false;
+      soundManager.playAlertSiren();
     }
 
     this.notifyBaseInterior();
@@ -258,25 +304,26 @@ export class GameStateManager {
         soundManager.playElectrostaticPulseSound();
         soundManager.playSuccessChime();
       } else {
-        // [B] Modo Abrigo (Desliga Lab/Estufa temporariamente, poupa bateria)
+        // [B] Modo Abrigo no Núcleo (Pausa Lab/Estufa 15s, poupa bateria)
         this.resources.baseSolarEnergy = Math.max(10, this.resources.baseSolarEnergy - 5);
         this.baseInterior.labPaused = true;
         this.baseInterior.greenhouseHealthy = false;
+        this.baseInterior.sectorPauseTimerSec = 15;
         this.baseInterior.shieldActive = true;
         this.baseInterior.ledState = 'NORMAL';
         this.baseInterior.activeEmergency = null;
         this.baseInterior.lastConsequenceFeedback = {
-          title: 'Modo Abrigo Ativado (Energia Poupada)',
+          title: 'Modo Abrigo no Núcleo (Pausa de 15s)',
           choiceLabel: active.optionB.label,
           scientificReason:
-            'Boa escolha! Desligar o Lab e a Estufa poupou as baterias durante o pico de radiação solar, embora as plantas Welwitschia tenham sentido a falta de luz.',
+            'Boa escolha! Como a Lua não tem magnetosfera global como a Terra, abrigar no núcleo e pausar o Lab por 15s poupou a bateria da base!',
           isPositive: true
         };
         soundManager.playUiBeep(720, 0.18);
       }
     } else if (type === 'LUNAR_NIGHT_COLD') {
       if (choice === 'A') {
-        // [A] Aquecimento Total (Consome +Bateria, mantém +20°C)
+        // [A] Aquecimento Total (-20% Bateria, mantém +21°C)
         this.resources.baseSolarEnergy = Math.max(15, this.resources.baseSolarEnergy - 20);
         this.baseInterior.cabinTempC = 21;
         this.baseInterior.frostLevel = 0;
@@ -289,24 +336,25 @@ export class GameStateManager {
           title: 'Aquecimento Total (+21°C Estável)',
           choiceLabel: active.optionA.label,
           scientificReason:
-            'Kandandu pela decisão rápida! No Polo Sul da Lua a noite atinge -180°C. Manter +21°C preserva a fotossíntese da Welwitschia mirabilis!',
+            'Kandandu pela rapidez! Segundo a sonda LRO da NASA, as crateras sombreadas atingem -173°C. Manter +21°C protegeu a Welwitschia mirabilis!',
           isPositive: true
         };
         soundManager.playSuccessChime();
       } else {
-        // [B] Isolar Laboratório (Poupa energia, pausa ciência)
+        // [B] Isolar Setores Secundários (Poupa energia, pausa ciência por 15s)
         this.resources.baseSolarEnergy = Math.max(10, this.resources.baseSolarEnergy - 5);
-        this.baseInterior.cabinTempC = 12;
-        this.baseInterior.frostLevel = 0.25;
+        this.baseInterior.cabinTempC = 14;
+        this.baseInterior.frostLevel = 0.22;
         this.baseInterior.labPaused = true;
+        this.baseInterior.sectorPauseTimerSec = 15;
         this.baseInterior.greenhouseHealthy = true;
         this.baseInterior.ledState = 'NORMAL';
         this.baseInterior.activeEmergency = null;
         this.baseInterior.lastConsequenceFeedback = {
-          title: 'Laboratório Isolado Termicamente',
+          title: 'Setores Secundários Isolados (15s)',
           choiceLabel: active.optionB.label,
           scientificReason:
-            'Decisão inteligente! No vácuo lunar o calor perde-se por radiação infravermelha. Isolar compartimentos reduz a perda térmica e poupa bateria.',
+            'Decisão inteligente! No vácuo lunar sem ar, o calor escapa por radiação infravermelha. Concentrar calor na Estufa e O₂ poupou energia!',
           isPositive: true
         };
         soundManager.playUiBeep(680, 0.18);
@@ -373,6 +421,70 @@ export class GameStateManager {
         };
         soundManager.playValveCalibratedBeep(1);
       }
+    } else if (type === 'FUEL_CELL_OVERLOAD') {
+      if (choice === 'A') {
+        // [A] Dissipar Calor nos Radiadores Externos (Pausa Estufa por 10s)
+        this.baseInterior.cabinTempC = 21;
+        this.baseInterior.greenhouseHealthy = false;
+        this.baseInterior.sectorPauseTimerSec = 10;
+        this.baseInterior.ledState = 'NORMAL';
+        this.baseInterior.activeEmergency = null;
+        this.baseInterior.lastConsequenceFeedback = {
+          title: 'Calor Dissipado nos Radiadores (Estufa Pausa 10s)',
+          choiceLabel: active.optionA.label,
+          scientificReason:
+            'Muito bem! Ao meio-dia lunar a superfície chega a +127°C. Os radiadores infravermelhos da NASA dissiparam a sobrecarga sem danificar a base!',
+          isPositive: true
+        };
+        soundManager.playSuccessChime();
+      } else {
+        // [B] Armazenar Excesso no Laboratório (+12 Ciência, risco de -10% Integridade)
+        this.baseInterior.cabinTempC = 23;
+        this.baseInterior.baseIntegrity = Math.max(50, this.baseInterior.baseIntegrity - 10);
+        this.resources.roverIntegrity = this.baseInterior.baseIntegrity;
+        this.unlockDiscovery('MOON', 'Termodinâmica Lunar (+127°C Dia / -173°C Noite)');
+        this.baseInterior.ledState = 'NORMAL';
+        this.baseInterior.activeEmergency = null;
+        this.baseInterior.lastConsequenceFeedback = {
+          title: 'Energia Canalizada ao Laboratório (+Ciência, -10% Integridade)',
+          choiceLabel: active.optionB.label,
+          scientificReason:
+            'Ganhaste dados científicos valiosos sobre o pico solar de +127°C, mas a tensão térmica reduziu 10% da integridade das condutas!',
+          isPositive: true
+        };
+        soundManager.playUiBeep(740, 0.2);
+      }
+    } else if (type === 'GREENHOUSE_DEHYDRATION') {
+      if (choice === 'A') {
+        // [A] Transferir Água do Suporte de Vida (-12% O2, salva colheita)
+        this.resources.baseOxygen = Math.max(25, this.resources.baseOxygen - 12);
+        this.baseInterior.greenhouseHealthy = true;
+        this.baseInterior.ledState = 'NORMAL';
+        this.baseInterior.activeEmergency = null;
+        this.unlockDiscovery('ICE_CRYSTAL', 'Reciclagem Hidropónica Fechada NASA & Welwitschia');
+        this.baseInterior.lastConsequenceFeedback = {
+          title: 'Hidratação ISRU Concluída (-12% O₂, Colheita Salva)',
+          choiceLabel: active.optionA.label,
+          scientificReason:
+            'Excelente! Na Lua, a água extraída do gelo polar serve tanto para produzir O₂ por eletrólise como para regar a nossa Welwitschia mirabilis!',
+          isPositive: true
+        };
+        soundManager.playSuccessChime();
+      } else {
+        // [B] Modo Dormência da Welwitschia (Pausa produção por 15s, 0 custo)
+        this.baseInterior.greenhouseHealthy = false;
+        this.baseInterior.sectorPauseTimerSec = 15;
+        this.baseInterior.ledState = 'NORMAL';
+        this.baseInterior.activeEmergency = null;
+        this.baseInterior.lastConsequenceFeedback = {
+          title: 'Modo Dormência do Namibe Ativado (15s, 0 Custo)',
+          choiceLabel: active.optionB.label,
+          scientificReason:
+            'Sabias que a Welwitschia mirabilis vive mais de 1.000 anos no Deserto do Namibe em Angola? Ela fecha os estomas para poupar água!',
+          isPositive: true
+        };
+        soundManager.playUiBeep(690, 0.18);
+      }
     }
 
     this.notifyResources();
@@ -437,6 +549,21 @@ export class GameStateManager {
   public updateBaseInterior(delta: number): void {
     if (this.currentState !== 'STATE_DOME_MANAGEMENT') return;
 
+    let changed = false;
+
+    // 1. Temporizador de pausa temporária de setores (Estufa / Laboratório) após escolhas táticas
+    if (this.baseInterior.sectorPauseTimerSec > 0) {
+      this.baseInterior.sectorPauseTimerSec = Math.max(0, this.baseInterior.sectorPauseTimerSec - delta);
+      if (this.baseInterior.sectorPauseTimerSec <= 0) {
+        this.baseInterior.labPaused = false;
+        this.baseInterior.greenhouseHealthy = true;
+        this.baseInterior.cabinTempC = 21;
+        this.baseInterior.frostLevel = 0;
+        changed = true;
+      }
+    }
+
+    // 2. Calibração de 2 válvulas de O2 em 12s
     if (this.baseInterior.valveCalibration.active) {
       this.baseInterior.valveCalibration.timeRemainingSec = Math.max(
         0,
@@ -455,12 +582,36 @@ export class GameStateManager {
           title: 'Tempo Esgotado — Selagem Automática Ativada (-10% Integridade)',
           choiceLabel: 'Protocolo de Segurança Automático',
           scientificReason:
-            'No vácuo lunar não podemos perder todo o ar! Como os 12 segundos terminaram, o computador selou a conduta automaticamente.',
+            'No vácuo lunar (10⁻¹² torr) não podemos perder todo o ar! Como os 12 segundos terminaram, o computador selou a conduta automaticamente.',
           isPositive: false
         };
         soundManager.playAlertSiren();
         this.notifyResources();
       }
+      this.notifyBaseInterior();
+      return;
+    }
+
+    // 3. Motor Autónomo de Eventos Aleatórios da NASA (entre 22s e 45s, nunca simultâneos)
+    if (!this.baseInterior.activeEmergency && !this.domeInteractions.airlockOpened) {
+      this.baseInterior.nextAutonomousEventSec -= delta;
+      if (this.baseInterior.nextAutonomousEventSec <= 0) {
+        const allTypes: BaseEmergencyType[] = [
+          'SOLAR_STORM',
+          'LUNAR_NIGHT_COLD',
+          'ELECTROSTATIC_DUST',
+          'OXYGEN_LEAK',
+          'FUEL_CELL_OVERLOAD',
+          'GREENHOUSE_DEHYDRATION'
+        ];
+        const candidates = allTypes.filter((t) => t !== this.lastEmergencyType);
+        const randomType = candidates[Math.floor(Math.random() * candidates.length)];
+        this.triggerBaseEmergency(randomType);
+        return;
+      }
+    }
+
+    if (changed) {
       this.notifyBaseInterior();
     }
   }
@@ -709,6 +860,8 @@ export class GameStateManager {
         valve1Calibrated: false,
         valve2Calibrated: false
       },
+      sectorPauseTimerSec: 0,
+      nextAutonomousEventSec: 26,
       lastConsequenceFeedback: null
     };
     this.stormDilemmaTriggered = false;

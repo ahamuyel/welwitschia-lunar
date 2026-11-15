@@ -34,6 +34,7 @@ export function App() {
   const [activePanel, setActivePanel] = useState<ActiveUIPanel>('none');
   const [isVRActive, setIsVRActive] = useState<boolean>(true); // Modo VR ativado como padrão
   const [isRadarVisible, setIsRadarVisible] = useState<boolean>(false); // Oculto por padrão na base, ativável sob demanda
+  const [isChatOpen, setIsChatOpen] = useState<boolean>(false); // Chat com a IA Welly fechado por padrão, sob demanda
   const [isNearBaseAirlock, setIsNearBaseAirlock] = useState<boolean>(false);
   const [touchDriveInputs, setTouchDriveInputs] = useState<TouchDriveInputs>({
     forward: false,
@@ -296,13 +297,15 @@ export function App() {
         />
       )}
 
-      {/* 2. Copiloto IA Welly (Toast único discreto no rodapé que desmonta após 4s) */}
+      {/* 2. Copiloto IA Welly (Toast único de 4.5s quando fechado + Painel de Chat 100% offline sob demanda) */}
       <WellyCopilot
         currentTrigger={wellyTrigger}
         telemetry={telemetry}
         resources={resources}
         gameState={gameState}
         baseInterior={baseInterior}
+        isChatOpen={isChatOpen}
+        onCloseChat={() => setIsChatOpen(false)}
       />
 
       {/* 2.5 Mini-Radar Lunar Compacto (96x96px, pointer-events-none, sob demanda) */}
@@ -328,6 +331,8 @@ export function App() {
           onToggleVR={() => setIsVRActive((prev) => !prev)}
           isRadarVisible={isRadarVisible}
           onToggleRadar={() => setIsRadarVisible((prev) => !prev)}
+          isChatOpen={isChatOpen}
+          onToggleChat={() => setIsChatOpen((prev) => !prev)}
           onRedirectEnergy={handleRedirectEnergy}
           onRefillSuitOxygen={handleRefillSuitOxygen}
           onViewBriefing={handleViewBriefing}
@@ -354,6 +359,8 @@ export function App() {
           onToggleVR={() => setIsVRActive((prev) => !prev)}
           isRadarVisible={isRadarVisible}
           onToggleRadar={() => setIsRadarVisible((prev) => !prev)}
+          isChatOpen={isChatOpen}
+          onToggleChat={() => setIsChatOpen((prev) => !prev)}
           onTouchDriveInputs={setTouchDriveInputs}
         />
       )}

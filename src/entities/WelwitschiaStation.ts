@@ -69,6 +69,13 @@ export class WelwitschiaStation {
     'OXYGEN' | 'SHIELD' | 'GREENHOUSE' | 'LAB',
     THREE.MeshBasicMaterial[]
   > = new Map();
+  // Monitores 3D de Telemetria em Tempo Real (atualizados a 10 FPS para manter 60 FPS no mobile)
+  private liveStationMonitors: Map<
+    'OXYGEN' | 'SHIELD' | 'GREENHOUSE' | 'LAB',
+    { canvas: HTMLCanvasElement; texture: THREE.CanvasTexture }
+  > = new Map();
+  private lastTelemetryDrawTime: number = -1;
+  private interiorAirlockStatusMat!: THREE.MeshBasicMaterial;
   private targetLedColor: THREE.Color = new THREE.Color(0x00f0ff);
   private floorGuideMat!: THREE.MeshStandardMaterial;
   private cabinAirParticles!: THREE.Points;
@@ -372,6 +379,11 @@ export class WelwitschiaStation {
     this.group.add(centerRing);
 
     // =========================================================================
+    // ARQUITETURA INTERIOR AEROESPACIAL MADURA (ESTÉTICA NASA ARTEMIS / GATEWAY)
+    // =========================================================================
+    this.buildInteriorAerospaceArchitecture();
+
+    // =========================================================================
     // 4 ESTAÇÕES DE TRABALHO 3D DISTINTAS E ANIMADAS NO INTERIOR DA BASE
     // =========================================================================
     this.buildStationA_OxygenLifeSupport();
@@ -549,6 +561,494 @@ export class WelwitschiaStation {
   }
 
   /**
+   * Arquitetura Interior Aeroespacial Madura (Estética NASA Artemis / Gateway):
+   * - Vigas estruturais curvas de titânio escovado e anéis de antepara
+   * - Painéis acústicos acolchoados (Nomex/Beta-cloth) nas paredes inferiores
+   * - Tubagens codificadas por cor (Azul = Água/O2, Laranja = Energia Solar, Verde = Hidroponia)
+   * - Dutos de ventilação ECLSS iluminados
+   * - Escotilha de Airlock interna detalhada com volante de travamento e indicador de pressurização (101.3 kPa)
+   */
+  private buildInteriorAerospaceArchitecture(): void {
+    const archGroup = new THREE.Group();
+
+    const brushedTitaniumMat = new THREE.MeshStandardMaterial({
+      color: 0x94a3b8,
+      metalness: 0.78,
+      roughness: 0.26,
+      emissive: 0x0f172a,
+      emissiveIntensity: 0.18
+    });
+
+    // 1. Anéis horizontais de antepara estrutural (vigas curvas de titânio escovado)
+    [2.8, 5.4, 7.8].forEach((heightY, idx) => {
+      const ringRadius = 11.4 - idx * 1.15;
+      const beamGeo = new THREE.TorusGeometry(ringRadius, 0.11, 8, 48);
+      beamGeo.rotateX(Math.PI / 2);
+      const beam = new THREE.Mesh(beamGeo, brushedTitaniumMat);
+      beam.position.y = heightY;
+      archGroup.add(beam);
+    });
+
+    // 2. Painéis acústicos acolchoados nas paredes inferiores (estética ISS / Lunar Gateway)
+    const acousticPadMat = new THREE.MeshStandardMaterial({
+      color: 0xcbd5e1,
+      roughness: 0.68,
+      metalness: 0.12,
+      emissive: 0x1e293b,
+      emissiveIntensity: 0.22
+    });
+    const padTrimMat = new THREE.MeshStandardMaterial({
+      color: 0x475569,
+      metalness: 0.65,
+      roughness: 0.32
+    });
+
+    for (let i = 0; i < 12; i++) {
+      const angle = (i / 12) * Math.PI * 2;
+      // Deixa abertura livre na entrada sul do Airlock (angle ~ 0 em z+)
+      if (Math.abs(Math.sin(angle)) < 0.28 && Math.cos(angle) > 0.7) continue;
+
+      const panelGroup = new THREE.Group();
+      const radius = 10.6;
+      panelGroup.position.set(Math.sin(angle) * radius, 2.35, Math.cos(angle) * radius);
+      panelGroup.lookAt(0, 2.35, 0);
+
+      const frame = new THREE.Mesh(new THREE.BoxGeometry(2.6, 1.75, 0.12), padTrimMat);
+      panelGroup.add(frame);
+
+      // Almofadas acústicas modulares 2x2
+      [-0.6, 0.6].forEach((ox) => {
+        [-0.38, 0.38].forEach((oy) => {
+          const cushion = new THREE.Mesh(new THREE.BoxGeometry(1.12, 0.68, 0.08), acousticPadMat);
+          cushion.position.set(ox, oy, 0.06);
+          panelGroup.add(cushion);
+        });
+      });
+
+      archGroup.add(panelGroup);
+    }
+
+    // 3. Tubagens Codificadas por Cor (Azul = Água/O2, Laranja = Energia Solar, Verde = Hidroponia)
+    const pipeSpecs = [
+      { y: 1.52, color: 0x0ea5e9, emissive: 0x0284c7, label: 'O2_WATER' },     // Azul: Água / O2
+      { y: 1.68, color: 0xf59e0b, emissive: 0xb45309, label: 'SOLAR_POWER' },  // Laranja: Energia Solar
+      { y: 1.84, color: 0x22c55e, emissive: 0x15803d, label: 'HYDROPONICS' }   // Verde: Hidroponia
+    ];
+
+    pipeSpecs.forEach((spec) => {
+      const pipeMat = new THREE.MeshStandardMaterial({
+        color: spec.color,
+        emissive: spec.emissive,
+        emissiveIntensity: 0.35,
+        metalness: 0.72,
+        roughness: 0.25
+      });
+      const perimPipeGeo = new THREE.TorusGeometry(9.95, 0.055, 8, 48, Math.PI * 1.72);
+      perimPipeGeo.rotateX(Math.PI / 2);
+      perimPipeGeo.rotateZ(Math.PI * 0.64);
+      const perimPipe = new THREE.Mesh(perimPipeGeo, pipeMat);
+      perimPipe.position.y = spec.y;
+      archGroup.add(perimPipe);
+    });
+
+    // Ramais de tubagem no piso ligando às estações correspondentes
+    const addFeedPipe = (x1: number, z1: number, x2: number, z2: number, hexColor: number) => {
+      const dx = x2 - x1;
+      const dz = z2 - z1;
+      const len = Math.hypot(dx, dz);
+      const feedGeo = new THREE.CylinderGeometry(0.05, 0.05, len, 10);
+      feedGeo.rotateX(Math.PI / 2);
+      const feedMat = new THREE.MeshStandardMaterial({
+        color: hexColor,
+        emissive: hexColor,
+        emissiveIntensity: 0.28,
+        metalness: 0.75,
+        roughness: 0.22
+      });
+      const mesh = new THREE.Mesh(feedGeo, feedMat);
+      mesh.position.set((x1 + x2) * 0.5, 1.38, (z1 + z2) * 0.5);
+      mesh.rotation.y = Math.atan2(dx, dz);
+      archGroup.add(mesh);
+    };
+
+    // Azul -> Suporte de Vida O2 (Norte), Laranja -> Blindagem Solar (Leste), Verde -> Estufa Welwitschia (Oeste)
+    addFeedPipe(0.45, -1.7, 0.45, -4.6, 0x0ea5e9);
+    addFeedPipe(1.7, 0.45, 4.7, 0.45, 0xf59e0b);
+    addFeedPipe(-1.7, -0.45, -4.7, -0.45, 0x22c55e);
+
+    // 4. Dutos de Ventilação ECLSS Iluminados no anel superior
+    const ventHousingMat = new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.8, roughness: 0.3 });
+    const ventGlowMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8 });
+
+    for (let v = 0; v < 8; v++) {
+      const vAngle = (v / 8) * Math.PI * 2 + Math.PI / 8;
+      const ventGroup = new THREE.Group();
+      ventGroup.position.set(Math.sin(vAngle) * 8.9, 5.35, Math.cos(vAngle) * 8.9);
+      ventGroup.lookAt(0, 5.0, 0);
+
+      const box = new THREE.Mesh(new THREE.BoxGeometry(1.45, 0.38, 0.22), ventHousingMat);
+      ventGroup.add(box);
+
+      for (let slat = -1; slat <= 1; slat++) {
+        const glowStrip = new THREE.Mesh(new THREE.BoxGeometry(1.22, 0.04, 0.24), ventGlowMat);
+        glowStrip.position.y = slat * 0.09;
+        ventGroup.add(glowStrip);
+      }
+
+      archGroup.add(ventGroup);
+    }
+
+    // 5. Escotilha de Airlock Interna Detalhada (Sul: z = +9.8m) com Indicador de Pressurização (101.3 kPa)
+    const bulkheadGroup = new THREE.Group();
+    bulkheadGroup.position.set(0, 1.35, 9.85);
+    bulkheadGroup.rotation.y = Math.PI; // Voltada para o interior da cúpula
+
+    const portalFrame = new THREE.Mesh(
+      new THREE.BoxGeometry(3.8, 3.6, 0.35),
+      brushedTitaniumMat
+    );
+    portalFrame.position.y = 1.8;
+    bulkheadGroup.add(portalFrame);
+
+    const hatchRing = new THREE.Mesh(
+      new THREE.TorusGeometry(1.35, 0.14, 12, 32),
+      new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.88, roughness: 0.22 })
+    );
+    hatchRing.position.set(0, 1.75, 0.18);
+    bulkheadGroup.add(hatchRing);
+
+    const hatchDisc = new THREE.Mesh(
+      new THREE.CylinderGeometry(1.28, 1.28, 0.16, 28),
+      new THREE.MeshStandardMaterial({ color: 0x64748b, metalness: 0.72, roughness: 0.32 })
+    );
+    hatchDisc.rotation.x = Math.PI / 2;
+    hatchDisc.position.set(0, 1.75, 0.16);
+    bulkheadGroup.add(hatchDisc);
+
+    // Volante central de travamento mecânico da escotilha (Dogging Wheel NASA)
+    const wheelRim = new THREE.Mesh(
+      new THREE.TorusGeometry(0.36, 0.045, 8, 20),
+      new THREE.MeshStandardMaterial({ color: 0xf59e0b, metalness: 0.85, roughness: 0.2 })
+    );
+    wheelRim.position.set(0, 1.75, 0.28);
+    bulkheadGroup.add(wheelRim);
+
+    // Barra superior luminosa de status de pressurização (101.3 kPa NOMINAL)
+    this.interiorAirlockStatusMat = new THREE.MeshBasicMaterial({ color: 0x10b981 });
+    const pressureBar = new THREE.Mesh(
+      new THREE.BoxGeometry(2.2, 0.16, 0.08),
+      this.interiorAirlockStatusMat
+    );
+    pressureBar.position.set(0, 3.28, 0.22);
+    bulkheadGroup.add(pressureBar);
+
+    archGroup.add(bulkheadGroup);
+    this.group.add(archGroup);
+  }
+
+  /**
+   * Cria um Monitor 3D Inclinado de Alta Definição com CanvasTexture dinâmica
+   * atualizada a 10 FPS para exibir ondas, barras de fluxo e telemetria real da estação.
+   */
+  private addLiveTelemetryMonitor(
+    parentGroup: THREE.Group,
+    stationKey: 'OXYGEN' | 'SHIELD' | 'GREENHOUSE' | 'LAB',
+    position: THREE.Vector3,
+    tiltX: number = 0.2
+  ): void {
+    const canvas = document.createElement('canvas');
+    canvas.width = 512;
+    canvas.height = 288;
+    const texture = new THREE.CanvasTexture(canvas);
+    this.liveStationMonitors.set(stationKey, { canvas, texture });
+
+    // Desenho inicial
+    this.drawLiveTelemetryMonitorCanvas(stationKey, 0);
+
+    const monitorGroup = new THREE.Group();
+    monitorGroup.position.copy(position);
+    monitorGroup.rotation.x = tiltX;
+
+    // Moldura aeroespacial em titânio escuro
+    const bezelGeo = new THREE.BoxGeometry(1.78, 1.04, 0.06);
+    const bezelMat = new THREE.MeshStandardMaterial({
+      color: 0x1e293b,
+      metalness: 0.85,
+      roughness: 0.25
+    });
+    const bezel = new THREE.Mesh(bezelGeo, bezelMat);
+    monitorGroup.add(bezel);
+
+    // Ecrã luminoso de alta nitidez
+    const screenGeo = new THREE.PlaneGeometry(1.66, 0.92);
+    const screenMat = new THREE.MeshBasicMaterial({
+      map: texture
+    });
+    const screen = new THREE.Mesh(screenGeo, screenMat);
+    screen.position.z = 0.035;
+    monitorGroup.add(screen);
+
+    parentGroup.add(monitorGroup);
+  }
+
+  /**
+   * Renderiza os gráficos de onda, fluxo de watts, curva térmica e espectrograma a 10 FPS.
+   */
+  private drawLiveTelemetryMonitorCanvas(
+    stationKey: 'OXYGEN' | 'SHIELD' | 'GREENHOUSE' | 'LAB',
+    time: number
+  ): void {
+    const entry = this.liveStationMonitors.get(stationKey);
+    if (!entry) return;
+
+    const { canvas, texture } = entry;
+    const ctx = canvas.getContext('2d')!;
+    const W = canvas.width;
+    const H = canvas.height;
+
+    const resources = this.lastResourcesState;
+    const interior = this.lastInteriorState;
+    const activeEm = interior?.activeEmergency;
+
+    const o2Pct = Math.round(resources?.baseOxygen ?? 90);
+    const solarPct = Math.round(resources?.baseSolarEnergy ?? 80);
+    const tempC = interior?.cabinTempC ?? 21;
+    const paused = !!interior?.labPaused;
+    const ghHealthy = interior ? interior.greenhouseHealthy && !paused : true;
+
+    // Determina estado ("NOMINAL", "ALERTA", "CRÍTICO") e cor principal
+    let statusLabel: 'NOMINAL' | 'ALERTA' | 'CRÍTICO' = 'NOMINAL';
+    let primaryColor = '#00f0ff';
+    let titleText = '';
+    let metricPrimary = '';
+    let metricSecondary = '';
+
+    if (stationKey === 'OXYGEN') {
+      titleText = 'ECLSS // SUPORTE DE VIDA O₂';
+      metricPrimary = `${o2Pct}%`;
+      metricSecondary = `PRESSÃO: 101.3 kPa • TRAJE: ${Math.round(resources?.suitOxygen ?? 90)}%`;
+      if (activeEm?.type === 'OXYGEN_LEAK' || o2Pct < 40) {
+        statusLabel = 'CRÍTICO';
+        primaryColor = '#ef4444';
+      } else if (o2Pct < 65) {
+        statusLabel = 'ALERTA';
+        primaryColor = '#f59e0b';
+      } else {
+        primaryColor = '#00f0ff';
+      }
+    } else if (stationKey === 'SHIELD') {
+      titleText = 'KAPTON // BLINDAGEM & ENERGIA';
+      metricPrimary = `${solarPct}%`;
+      metricSecondary = `FLUXO: ${Math.round(solarPct * 1.42)} kW • ESCUDO: ${interior?.shieldActive ? 'ATIVO' : 'STANDBY'}`;
+      if (activeEm?.type === 'SOLAR_STORM' || solarPct < 30) {
+        statusLabel = 'CRÍTICO';
+        primaryColor = '#ef4444';
+      } else if (
+        activeEm?.type === 'ELECTROSTATIC_DUST' ||
+        activeEm?.type === 'FUEL_CELL_OVERLOAD' ||
+        solarPct < 55
+      ) {
+        statusLabel = 'ALERTA';
+        primaryColor = '#f59e0b';
+      } else {
+        primaryColor = '#ffb84d';
+      }
+    } else if (stationKey === 'GREENHOUSE') {
+      titleText = 'HIDROPONIA // WELWITSCHIA MIRABILIS';
+      metricPrimary = `${tempC > 0 ? '+' : ''}${tempC}°C`;
+      metricSecondary = `EXT: -173°C a +127°C • FLORA: ${ghHealthy ? 'ÓTIMA' : 'DORMÊNCIA'}`;
+      if (activeEm?.type === 'LUNAR_NIGHT_COLD' || tempC < 5) {
+        statusLabel = 'CRÍTICO';
+        primaryColor = '#38bdf8';
+      } else if (activeEm?.type === 'GREENHOUSE_DEHYDRATION' || !ghHealthy) {
+        statusLabel = 'ALERTA';
+        primaryColor = '#f59e0b';
+      } else {
+        primaryColor = '#22c55e';
+      }
+    } else {
+      const sciencePts = Math.min(60, (interior?.discoveriesUnlocked ?? 0) * 20);
+      titleText = 'LAB // ESPECTROGRAFIA ISRU';
+      metricPrimary = `${sciencePts}/60`;
+      metricSecondary = `ALVO: ${interior?.activeHologram ?? 'MOON'} • H₂O POLAR`;
+      if (paused) {
+        statusLabel = 'ALERTA';
+        primaryColor = '#f59e0b';
+      } else {
+        primaryColor = '#a855f7';
+      }
+    }
+
+    // Fundo aeroespacial escuro com grelha técnica
+    ctx.fillStyle = '#040b1a';
+    ctx.fillRect(0, 0, W, H);
+
+    ctx.strokeStyle = 'rgba(56, 189, 248, 0.12)';
+    ctx.lineWidth = 1;
+    for (let gx = 24; gx < W; gx += 32) {
+      ctx.beginPath();
+      ctx.moveTo(gx, 48);
+      ctx.lineTo(gx, H - 48);
+      ctx.stroke();
+    }
+    for (let gy = 56; gy < H - 48; gy += 28) {
+      ctx.beginPath();
+      ctx.moveTo(16, gy);
+      ctx.lineTo(W - 16, gy);
+      ctx.stroke();
+    }
+
+    // Borda externa
+    ctx.strokeStyle = primaryColor;
+    ctx.lineWidth = 4;
+    ctx.strokeRect(4, 4, W - 8, H - 8);
+
+    // Cabeçalho técnico
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.95)';
+    ctx.fillRect(6, 6, W - 12, 42);
+
+    ctx.font = 'bold 17px monospace';
+    ctx.fillStyle = '#e2e8f0';
+    ctx.textAlign = 'left';
+    ctx.fillText(titleText, 16, 33);
+
+    // Pílula de Estado ("NOMINAL", "ALERTA", "CRÍTICO") + LED
+    const badgeColor =
+      statusLabel === 'CRÍTICO' ? '#ef4444' : statusLabel === 'ALERTA' ? '#f59e0b' : '#10b981';
+    ctx.fillStyle = badgeColor;
+    ctx.fillRect(W - 128, 12, 112, 28);
+    ctx.font = 'bold 15px monospace';
+    ctx.fillStyle = '#020617';
+    ctx.textAlign = 'center';
+    ctx.fillText(statusLabel, W - 72, 31);
+
+    // Área do Gráfico em Tempo Real (y: 58 a 212)
+    const graphLeft = 20;
+    const graphRight = W - 160;
+    const graphTop = 64;
+    const graphBottom = 214;
+    const graphW = graphRight - graphLeft;
+    const graphH = graphBottom - graphTop;
+    const midY = graphTop + graphH * 0.5;
+
+    ctx.strokeStyle = primaryColor;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+
+    if (stationKey === 'OXYGEN') {
+      // Curva senoidal dupla de fluxo de O2 e pressão parcial
+      const freq = statusLabel === 'CRÍTICO' ? 0.085 : 0.045;
+      const amp = statusLabel === 'CRÍTICO' ? graphH * 0.4 : graphH * 0.28;
+      for (let x = 0; x <= graphW; x += 4) {
+        const y =
+          midY +
+          Math.sin(x * freq + time * 4.5) * amp * 0.7 +
+          Math.cos(x * 0.025 - time * 2.8) * amp * 0.3;
+        if (x === 0) ctx.moveTo(graphLeft + x, y);
+        else ctx.lineTo(graphLeft + x, y);
+      }
+      ctx.stroke();
+    } else if (stationKey === 'SHIELD') {
+      // Onda de fluxo de watts solares + barras inferiores de campo Kapton
+      for (let x = 0; x <= graphW; x += 4) {
+        const wave =
+          Math.sin(x * 0.04 + time * 3.8) * (graphH * 0.25) +
+          Math.sin(x * 0.11 - time * 6.0) * (graphH * 0.1);
+        const y = midY - 10 + wave;
+        if (x === 0) ctx.moveTo(graphLeft + x, y);
+        else ctx.lineTo(graphLeft + x, y);
+      }
+      ctx.stroke();
+
+      // Barras de fluxo fotovoltaico
+      const barCount = 14;
+      const barW = graphW / barCount - 4;
+      ctx.fillStyle = primaryColor;
+      for (let b = 0; b < barCount; b++) {
+        const bh = 12 + Math.abs(Math.sin(time * 3.2 + b * 0.55)) * 34 * (solarPct / 100);
+        ctx.fillRect(graphLeft + b * (barW + 4), graphBottom - bh, barW, bh);
+      }
+    } else if (stationKey === 'GREENHOUSE') {
+      // Curva térmica comparando oscilação lunar externa (-173°C a +127°C) com estabilidade da estufa
+      for (let x = 0; x <= graphW; x += 4) {
+        const y =
+          midY +
+          Math.sin(x * 0.032 + time * 2.6) * (ghHealthy ? graphH * 0.18 : graphH * 0.38);
+        if (x === 0) ctx.moveTo(graphLeft + x, y);
+        else ctx.lineTo(graphLeft + x, y);
+      }
+      ctx.stroke();
+    } else {
+      // Espectrograma de amostras lunares (barras de frequência espectral H2O)
+      const specBars = 18;
+      const bw = graphW / specBars - 3;
+      for (let s = 0; s < specBars; s++) {
+        const factor = paused ? 0.15 : 0.35 + 0.65 * Math.abs(Math.sin(time * 4.2 + s * 0.65));
+        const bh = Math.max(8, factor * (graphH - 12));
+        ctx.fillStyle = s % 2 === 0 ? primaryColor : '#38bdf8';
+        ctx.fillRect(graphLeft + s * (bw + 3), graphBottom - bh, bw, bh);
+      }
+    }
+
+    // Painel lateral direito com percentagem/valor exato em destaque
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
+    ctx.fillRect(W - 148, 64, 132, 150);
+    ctx.strokeStyle = 'rgba(148, 163, 184, 0.3)';
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(W - 148, 64, 132, 150);
+
+    ctx.font = 'bold 34px monospace';
+    ctx.fillStyle = primaryColor;
+    ctx.textAlign = 'center';
+    ctx.fillText(metricPrimary, W - 82, 132);
+
+    ctx.font = 'bold 13px monospace';
+    ctx.fillStyle = '#94a3b8';
+    ctx.fillText('TELEMETRIA', W - 82, 164);
+
+    // Barra de progresso horizontal no painel direito
+    const pctVal =
+      stationKey === 'OXYGEN'
+        ? o2Pct
+        : stationKey === 'SHIELD'
+        ? solarPct
+        : stationKey === 'GREENHOUSE'
+        ? Math.max(10, Math.min(100, (tempC + 20) * 2))
+        : Math.min(100, ((interior?.discoveriesUnlocked ?? 1) * 33));
+    ctx.fillStyle = '#1e293b';
+    ctx.fillRect(W - 134, 180, 104, 14);
+    ctx.fillStyle = badgeColor;
+    ctx.fillRect(W - 134, 180, Math.round((104 * pctVal) / 100), 14);
+
+    // Rodapé de dados científicos NASA
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.95)';
+    ctx.fillRect(6, H - 42, W - 12, 36);
+    ctx.font = 'bold 15px monospace';
+    ctx.fillStyle = '#cbd5e1';
+    ctx.textAlign = 'left';
+    ctx.fillText(metricSecondary, 16, H - 19);
+
+    texture.needsUpdate = true;
+  }
+
+  /**
+   * Atualiza os 4 monitores 3D a exatamente 10 FPS (intervalo de 0.10s) para manter 60 FPS no mobile.
+   */
+  private updateLiveStationMonitors(time: number): void {
+    if (time - this.lastTelemetryDrawTime < 0.1) return;
+    this.lastTelemetryDrawTime = time;
+
+    (['OXYGEN', 'SHIELD', 'GREENHOUSE', 'LAB'] as const).forEach((key) => {
+      this.drawLiveTelemetryMonitorCanvas(key, time);
+    });
+
+    if (this.interiorAirlockStatusMat) {
+      const isEm = !!this.lastInteriorState?.activeEmergency;
+      this.interiorAirlockStatusMat.color.setHex(isEm ? 0xef4444 : 0x10b981);
+    }
+  }
+
+  /**
    * a) Estação de Suporte de Vida (O2) (Norte: z = -5.2m):
    * Cilindros translúcidos iluminados com partículas/anéis de oxigénio ascendentes
    * cuja velocidade reflete o nível de potência + 2 Válvulas 3D calibráveis por olhar.
@@ -621,6 +1121,9 @@ export class WelwitschiaStation {
 
     // 3 Barras Luminosas 3D de Energia integradas na frente da máquina de O2
     this.addIntegratedEnergyBars(stationGroup, 'OXYGEN', new THREE.Vector3(0, 0.48, 0.82));
+
+    // Monitor 3D Inclinado de Telemetria em Tempo Real (10 FPS)
+    this.addLiveTelemetryMonitor(stationGroup, 'OXYGEN', new THREE.Vector3(0, 3.15, 0.92), 0.22);
 
     this.group.add(stationGroup);
   }
@@ -704,6 +1207,9 @@ export class WelwitschiaStation {
     // 3 Barras Luminosas 3D integradas na máquina de Blindagem Kapton
     this.addIntegratedEnergyBars(shieldGroup, 'SHIELD', new THREE.Vector3(0, 0.45, 0.82));
 
+    // Monitor 3D Inclinado de Telemetria em Tempo Real (10 FPS)
+    this.addLiveTelemetryMonitor(shieldGroup, 'SHIELD', new THREE.Vector3(0, 3.05, 0.92), 0.22);
+
     this.group.add(shieldGroup);
   }
 
@@ -767,6 +1273,9 @@ export class WelwitschiaStation {
 
     // 3 Barras Luminosas 3D integradas na bancada da Estufa Welwitschia
     this.addIntegratedEnergyBars(ghGroup, 'GREENHOUSE', new THREE.Vector3(0, 0.5, 0.92));
+
+    // Monitor 3D Inclinado de Telemetria em Tempo Real (10 FPS)
+    this.addLiveTelemetryMonitor(ghGroup, 'GREENHOUSE', new THREE.Vector3(0, 2.38, 0.96), 0.18);
 
     this.group.add(ghGroup);
   }
@@ -858,6 +1367,9 @@ export class WelwitschiaStation {
 
     // 3 Barras Luminosas 3D integradas na base da Mesa Holográfica Científica
     this.addIntegratedEnergyBars(labGroup, 'LAB', new THREE.Vector3(0, 0.55, 1.25));
+
+    // Monitor 3D Inclinado de Telemetria Científica em Tempo Real (10 FPS)
+    this.addLiveTelemetryMonitor(labGroup, 'LAB', new THREE.Vector3(0, 1.48, 1.28), -0.25);
 
     this.group.add(labGroup);
   }
@@ -1222,6 +1734,9 @@ export class WelwitschiaStation {
 
     // 1b. Atualiza as 3 Barras Luminosas 3D integradas em cada uma das 4 máquinas
     this.updateStationEnergyBars(resources, interior);
+
+    // 1c. Atualiza os 4 Monitores 3D Vivos de Telemetria em Tempo Real (10 FPS)
+    this.updateLiveStationMonitors(time);
 
     // 2. Anéis/partículas de O2 ascendentes na Estação de Suporte de Vida (velocidade reflete potência/O2)
     const powerFactor = ((resources?.baseOxygen ?? 85) / 100) * ((resources?.baseSolarEnergy ?? 60) / 100);

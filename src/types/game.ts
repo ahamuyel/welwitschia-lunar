@@ -22,7 +22,9 @@ export type BaseEmergencyType =
   | 'SOLAR_STORM'
   | 'LUNAR_NIGHT_COLD'
   | 'ELECTROSTATIC_DUST'
-  | 'OXYGEN_LEAK';
+  | 'OXYGEN_LEAK'
+  | 'FUEL_CELL_OVERLOAD'
+  | 'GREENHOUSE_DEHYDRATION';
 
 export type HologramModelType = 'MOON' | 'EARTH' | 'ICE_CRYSTAL';
 
@@ -63,6 +65,8 @@ export interface BaseInteriorState {
   lastDiscoveryTitle: string;
   activeEmergency: BaseEmergencyEvent | null;
   valveCalibration: ValveCalibrationState;
+  sectorPauseTimerSec: number;
+  nextAutonomousEventSec: number;
   lastConsequenceFeedback: {
     title: string;
     scientificReason: string;

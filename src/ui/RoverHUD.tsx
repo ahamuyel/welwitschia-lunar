@@ -17,6 +17,8 @@ interface RoverHUDProps {
   onToggleVR: () => void;
   isRadarVisible: boolean;
   onToggleRadar: () => void;
+  isChatOpen: boolean;
+  onToggleChat: () => void;
   onTouchDriveInputs?: (inputs: TouchDriveInputs) => void;
 }
 
@@ -34,6 +36,8 @@ export const RoverHUD: React.FC<RoverHUDProps> = ({
   onToggleVR,
   isRadarVisible,
   onToggleRadar,
+  isChatOpen,
+  onToggleChat,
   onTouchDriveInputs
 }) => {
   const [isMuted, setIsMuted] = useState(soundManager.isAudioMuted());
@@ -123,7 +127,7 @@ export const RoverHUD: React.FC<RoverHUDProps> = ({
           <button
             type="button"
             onClick={onToggleRadar}
-            className={`pointer-events-auto min-h-[44px] min-w-[44px] px-3 rounded-full text-xs font-bold backdrop-blur-md border transition-all flex items-center justify-center cursor-pointer ${
+            className={`pointer-events-auto min-h-[44px] min-w-[44px] px-2.5 rounded-full text-xs font-bold backdrop-blur-md border transition-all flex items-center justify-center cursor-pointer ${
               isRadarVisible
                 ? 'bg-emerald-500/25 border-emerald-400/70 text-emerald-200'
                 : 'bg-slate-950/70 border-white/15 text-slate-100'
@@ -131,6 +135,19 @@ export const RoverHUD: React.FC<RoverHUDProps> = ({
             title="Mostrar / Ocultar Radar Lunar"
           >
             🧭 Radar
+          </button>
+
+          <button
+            type="button"
+            onClick={onToggleChat}
+            className={`pointer-events-auto min-h-[44px] min-w-[44px] px-2.5 rounded-full text-xs font-bold backdrop-blur-md border transition-all flex items-center justify-center cursor-pointer ${
+              isChatOpen
+                ? 'bg-cyan-500/25 border-cyan-400/70 text-cyan-200'
+                : 'bg-slate-950/70 border-white/15 text-slate-100'
+            }`}
+            title="Abrir / Fechar Chat com IA Welly"
+          >
+            🤖 Welly
           </button>
 
           <button
